@@ -15,6 +15,19 @@ from pathlib import Path
 from app_info import NAME, VERSION, BUILD, BUNDLE_ID, MIN_MACOS, UPSTREAM
 
 
+def deployment_versions(output):
+    """Read deployment targets, excluding SDK and linker tool versions."""
+    for command in re.split(r"Load command \d+", output):
+        if re.search(r"^\s*cmd LC_BUILD_VERSION\s*$", command, re.M):
+            match = re.search(r"^\s*minos (\d+(?:\.\d+)+)", command, re.M)
+        elif re.search(r"^\s*cmd LC_VERSION_MIN_MACOSX\s*$", command, re.M):
+            match = re.search(r"^\s*version (\d+(?:\.\d+)+)", command, re.M)
+        else:
+            continue
+        if match:
+            yield tuple(map(int, match[1].split(".")))
+
+
 def minimum_system(app):
     """A plist cannot lower the deployment target of bundled Python libraries."""
     versions = [tuple(map(int, MIN_MACOS.split(".")))]
@@ -24,8 +37,7 @@ def minimum_system(app):
         if path.suffix not in (".so", ".dylib") and path.name not in ("Python", NAME):
             continue
         result = subprocess.run(["vtool", "-show-build", str(path)], capture_output=True, text=True, check=True)
-        for value in re.findall(r"^\s*(?:minos|version)\s+(\d+(?:\.\d+)+)", result.stdout, re.M):
-            versions.append(tuple(map(int, value.split("."))))
+        versions.extend(deployment_versions(result.stdout))
     return ".".join(map(str, max(versions)))
 
 
@@ -51,13 +63,17 @@ def main():
     config.write_text(json.dumps({"repository": args.release_repo}), encoding="utf-8")
     licenses = build / "ThirdPartyLicenses"
     licenses.mkdir(exist_ok=True)
+    for previous in licenses.iterdir():
+        if previous.is_file():
+            previous.unlink()
     for package in ("pywebview", "bottle", "proxy_tools", "certifi", "pyobjc-core", "pyobjc-framework-Cocoa",
                     "pyobjc-framework-WebKit", "pyobjc-framework-Quartz", "pyobjc-framework-security", "PyInstaller"):
         distribution = importlib.metadata.distribution(package)
         for file in distribution.files or []:
-            if "/licenses/" in str(file) or file.name.upper().startswith(("LICENSE", "COPYING")):
+            if "/licenses/" in str(file) or file.name.upper() in ("LICENSE", "COPYING", "LICENSE.TXT", "LICENSE.MD", "COPYING.TXT", "COPYING.MD"):
                 source = Path(distribution.locate_file(file))
                 if source.is_file():
+                    source.read_text(encoding="utf-8")  # Never mistake a module named copying for a license.
                     shutil.copy2(source, licenses / f"{package}-{file.name}")
 
     PyInstaller.__main__.run([
