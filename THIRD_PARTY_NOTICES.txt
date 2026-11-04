@@ -1,0 +1,15 @@
+秒薪 Mac 版使用以下第三方组件。原项目的名称与来源在此保留，不为原项目另行指定许可证。
+原项目：https://github.com/liumingshuo77-cmyk/miaoxin
+
+Python — Python Software Foundation License: https://docs.python.org/3/license.html
+pywebview — BSD-3-Clause: https://github.com/r0x0r/pywebview/blob/master/LICENSE
+PyObjC — MIT: https://github.com/ronaldoussoren/pyobjc/blob/main/LICENSE.txt
+Bottle — MIT: https://github.com/bottlepy/bottle/blob/master/LICENSE
+proxy_tools — BSD: https://github.com/jtushman/proxy_tools
+certifi CA bundle — MPL-2.0: https://github.com/certifi/python-certifi/blob/master/LICENSE
+PyInstaller bootloader — GPL with bootloader distribution exception:
+https://pyinstaller.org/en/stable/license.html
+
+WebKit 与 Cocoa 由 macOS 系统提供。
+构建使用 Pillow（HPND / Pillow license），Pillow 不作为本应用运行依赖。
+各组件完整许可文本随构建环境的软件包提供；本文件用于来源与许可索引。
