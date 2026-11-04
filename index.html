@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>秒薪</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #e9e2d6;
+      color: #221f1b;
+      font: 15px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+    h1, h2, p { margin: 0; }
+    h1 {
+      font-family: "Palatino Linotype", Palatino, "Songti SC", Georgia, serif;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+    }
+    h2 { font-size: 14px; font-weight: 650; letter-spacing: 0.1em; }
+    button, input { font: inherit; color: inherit; }
+    button { background: transparent; border: 1px solid #cfc6b8; padding: 7px 10px; cursor: pointer; }
+    button.quiet { border: none; padding: 4px 0; letter-spacing: 0.12em; color: #6f675e; }
+    button.link { border: none; padding: 0; color: #6f675e; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #221f1b; outline-offset: 2px; }
+    input[type="text"], input[type="time"] {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #cfc6b8;
+      border-radius: 0;
+      padding: 6px 0;
+      font-size: 16px;
+    }
+    input[type="range"] { width: 100%; accent-color: #221f1b; margin: 10px 0 0; }
+    input:focus { outline: none; border-bottom-color: #221f1b; }
+    .muted { color: #6f675e; }
+    .up { color: #1d6b45; }
+    .down { color: #8f3d32; }
+    #fatal { position: absolute; z-index: 5; left: 16px; right: 16px; top: 8px; color: #8f3d32; }
+    #fatal:empty { display: none; }
+
+    .scene { height: 100%; perspective: 1400px; }
+    #flip {
+      position: relative;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.55s ease;
+    }
+    #flip.is-back { transform: rotateY(180deg); }
+    .face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .face.back { transform: rotateY(180deg); }
+    #flip.is-back .front { pointer-events: none; }
+    #flip:not(.is-back) .back { pointer-events: none; }
+    .sheet { height: 100%; overflow: auto; padding: 22px 22px 40px; }
+
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .label { color: #6f675e; letter-spacing: 0.08em; font-size: 13px; margin-top: 26px; }
+    .clock {
+      margin-top: 22px;
+      font-family: "Palatino Linotype", Palatino, Georgia, serif;
+      font-size: 56px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .hero-num {
+      font-family: "Palatino Linotype", Palatino, Georgia, serif;
+      font-size: 44px;
+      font-weight: 500;
+      line-height: 1.05;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+    }
+    .food {
+      margin: 0;
+      font-size: 42px;
+      line-height: 1;
+      text-align: center;
+    }
+    .food:empty { display: none; }
+    .food::after {
+      content: attr(data-word);
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    #live {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #1d6b45;
+      vertical-align: middle;
+    }
+    #live[hidden] { display: none; }
+    #live.on { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.3; } }
+    .stats, .ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 16px; }
+    .stats div, .ledger div { border-top: 1px solid #d9d0c3; padding-top: 8px; }
+    .stats span, .ledger dt { display: block; color: #6f675e; font-size: 12px; letter-spacing: 0.04em; }
+    .stats b, .ledger dd {
+      display: block;
+      margin: 2px 0 0;
+      font-weight: 500;
+      font-size: 22px;
+      font-family: "Palatino Linotype", Palatino, Georgia, serif;
+      font-variant-numeric: tabular-nums;
+    }
+    .bar { height: 4px; background: #ddd6ca; margin-top: 18px; }
+    .bar > div { height: 100%; width: 0; background: #221f1b; }
+    .stack { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .block { margin-top: 26px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 14px; }
+    .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; letter-spacing: 0.04em; color: #6f675e; }
+    .ot-row { display: flex; align-items: center; gap: 12px; }
+    .ot-row b { min-width: 52px; font-weight: 650; color: #221f1b; font-variant-numeric: tabular-nums; }
+    .checks { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 14px; }
+    .checks label { display: flex; gap: 6px; align-items: center; }
+    .row-actions { display: flex; gap: 8px; align-items: end; margin-top: 12px; }
+    .adder { display: grid; grid-template-columns: 1fr 72px 72px auto; gap: 10px; align-items: end; margin-top: 12px; }
+    .suggest-wrap { position: relative; }
+    #suggest {
+      position: absolute;
+      z-index: 3;
+      left: 0;
+      right: 0;
+      top: 100%;
+      background: #f6f1e8;
+      border: 1px solid #d9d0c3;
+      max-height: 220px;
+      overflow: auto;
+    }
+    #suggest[hidden] { display: none; }
+    #suggest button { display: block; width: 100%; text-align: left; border: none; border-top: 1px solid #e5ddd0; background: transparent; }
+    .pos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-top: 1px solid #d9d0c3;
+    }
+    .pos.head { display: none; }
+    .pos > :first-child { grid-column: 1 / -1; }
+    .pos .px::before, .pos .day::before, .pos .mon::before, .pos .all::before {
+      color: #6f675e;
+      font-size: 12px;
+    }
+    .pos .px::before { content: "现价 "; }
+    .pos .day::before { content: "今日 "; }
+    .pos .mon::before { content: "本月 "; }
+    .pos .all::before { content: "成本 "; }
+    .nm { font-weight: 650; }
+    .mini { display: flex; gap: 14px; margin-top: 4px; }
+    .mini label { font-size: 12px; color: #6f675e; }
+    .mini input { width: 84px; font-size: 14px; }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 8px; }
+    .dow { font-size: 12px; color: #6f675e; text-align: center; padding: 4px 0; }
+    .cal button {
+      min-height: 46px;
+      text-align: left;
+      padding: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+    }
+    .cal button.today { border-color: #221f1b; }
+    .cal .d { display: block; font-variant-numeric: tabular-nums; }
+    .cal .k { display: block; font-size: 11px; line-height: 1.2; }
+    .tag-paid { color: #8a5a2a; }
+    .tag-unpaid { color: #8f3d32; }
+    .tag-off { color: #6f675e; }
+    .foot { margin-top: 22px; font-size: 12px; color: #6f675e; }
+  </style>
+</head>
+<body>
+  <p id="fatal"></p>
+  <div class="scene">
+    <div id="flip">
+      <section class="face front">
+        <div class="sheet">
+          <div class="top">
+            <h1>秒薪</h1>
+            <button type="button" class="quiet" id="openBack">设置</button>
+          </div>
+          <p id="clock" class="clock">00:00:00</p>
+          <p class="muted" style="margin-top:8px"><span id="todayLabel">—</span> · <span id="dayState">—</span></p>
+
+          <p class="label"><span id="live" hidden></span>今日</p>
+          <div class="hero-row">
+            <p id="hero" class="hero-num">¥0.00</p>
+            <p id="food" class="food"></p>
+          </div>
+          <div class="stack">
+            <p id="punchStatus"></p>
+            <p id="spendInfo" class="muted"></p>
+            <p id="rentInfo" class="muted"></p>
+            <p id="secLine" class="muted"></p>
+          </div>
+          <div class="stats">
+            <div><span>工资</span><b id="payToday">¥0.00</b></div>
+            <div><span>股票</span><b id="stockToday">¥0.00</b></div>
+          </div>
+          <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+          <div class="stack">
+            <p id="shiftLine"></p>
+            <p id="stockEq"></p>
+          </div>
+
+          <div class="block">
+            <h2>本月</h2>
+            <dl class="ledger">
+              <div><dt>所赚</dt><dd id="monthEarn">¥0.00</dd></div>
+              <div><dt>工资</dt><dd id="monthPay">¥0.00</dd></div>
+              <div><dt>股票</dt><dd id="monthStock">¥0.00</dd></div>
+              <div><dt>开销</dt><dd id="monthSpend">¥0.00</dd></div>
+            </dl>
+            <div class="stack">
+              <p id="forecast" class="muted"></p>
+              <p id="bookTotal"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="face back">
+        <div class="sheet">
+          <div class="top">
+            <h1>设置</h1>
+            <button type="button" class="quiet" id="openFront">完成</button>
+          </div>
+
+          <div class="block">
+            <h2>今日</h2>
+            <div class="grid2">
+              <label class="field">上班<input id="punchIn" type="time"></label>
+              <label class="field">下班<input id="punchOut" type="time"></label>
+            </div>
+            <div class="row-actions">
+              <button type="button" id="useShiftStart">按班次</button>
+            </div>
+          </div>
+
+          <div class="block">
+            <h2>昨日</h2>
+            <label class="field" style="margin-top:12px">开销
+              <input id="ySpend" type="text" inputmode="decimal" autocomplete="off">
+            </label>
+            <p id="ySpendHint" class="muted" style="margin-top:8px"></p>
+          </div>
+
+          <div class="block">
+            <h2>薪资</h2>
+            <label class="field" style="margin-top:12px">月薪
+              <input id="salary" type="text" inputmode="decimal" autocomplete="off">
+            </label>
+            <label class="field" style="margin-top:12px">房租
+              <input id="rent" type="text" inputmode="decimal" autocomplete="off">
+            </label>
+            <p id="rentNote" class="muted" style="margin-top:8px"></p>
+            <div class="grid2">
+              <label class="field">上班<input id="start" type="time" value="09:00"></label>
+              <label class="field">下班<input id="end" type="time" value="18:00"></label>
+              <label class="field">午休起<input id="lunchStart" type="time" value="12:00"></label>
+              <label class="field">午休止<input id="lunchEnd" type="time" value="13:30"></label>
+            </div>
+            <label class="field" style="margin-top:14px">加班倍率
+              <span class="ot-row">
+                <input id="ot" type="range" min="0" max="3" step="0.1" value="1">
+                <b id="otLabel">1.0 倍</b>
+              </span>
+            </label>
+            <div class="checks" id="weekdays">
+              <span class="muted">工作日</span>
+              <label><input type="checkbox" data-dow="1" checked>一</label>
+              <label><input type="checkbox" data-dow="2" checked>二</label>
+              <label><input type="checkbox" data-dow="3" checked>三</label>
+              <label><input type="checkbox" data-dow="4" checked>四</label>
+              <label><input type="checkbox" data-dow="5" checked>五</label>
+              <label><input type="checkbox" data-dow="6">六</label>
+              <label><input type="checkbox" data-dow="0">日</label>
+              <label><input type="checkbox" id="useHoliday" checked>2026 放假</label>
+              <label><input type="checkbox" id="deductLunch" checked>午休不计</label>
+            </div>
+            <p id="rateNote" class="muted" style="margin-top:8px"></p>
+          </div>
+
+          <div class="block">
+            <h2>股票</h2>
+            <p id="bookExplain" hidden></p>
+            <div id="positions" style="margin-top:8px"></div>
+            <div class="adder">
+              <div class="suggest-wrap">
+                <label class="field">名称
+                  <input id="stockQ" type="text" placeholder="代码或名称" autocomplete="off" spellcheck="false">
+                </label>
+                <div id="suggest" hidden></div>
+              </div>
+              <label class="field">股数<input id="stockQty" type="text" inputmode="decimal" autocomplete="off"></label>
+              <label class="field">成本<input id="stockCost" type="text" inputmode="decimal" autocomplete="off"></label>
+              <button type="button" id="addStock">加入</button>
+            </div>
+            <p id="quoteStatus" class="muted" style="margin-top:8px"></p>
+          </div>
+
+          <div class="block">
+            <div class="cal-head">
+              <h2>休假</h2>
+              <p id="calTitle"></p>
+              <span>
+                <button type="button" id="prevMonth">上月</button>
+                <button type="button" id="nextMonth">下月</button>
+              </span>
+            </div>
+            <div id="calGrid" class="cal"></div>
+            <p id="calNote" hidden></p>
+          </div>
+
+          <div class="block">
+            <button type="button" id="copyBtn">复制</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

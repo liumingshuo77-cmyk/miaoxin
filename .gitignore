@@ -1,0 +1,7 @@
+state.json
+state.tmp
+秒薪.log
+__pycache__/
+build/
+dist/
+*.spec
