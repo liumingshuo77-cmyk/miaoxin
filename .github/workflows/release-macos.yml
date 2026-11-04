@@ -44,6 +44,8 @@ jobs:
       - run: node test_calc.js
       - run: python tests/smoke_macos.py
       - run: python build_mac.py --dmg --release-repo "${{ github.repository }}"
+      - name: Verify supported deployment target
+        run: python -c 'import glob,json; manifests=glob.glob("dist/*.manifest.json"); assert manifests; assert all(tuple(map(int,json.load(open(p))["minimum_macos"].split("."))) <= (15,0,0) for p in manifests)'
       - name: Upload installer and checksums
         env:
           GH_TOKEN: ${{ github.token }}

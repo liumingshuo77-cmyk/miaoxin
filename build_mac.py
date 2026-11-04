@@ -15,6 +15,20 @@ from pathlib import Path
 from app_info import NAME, VERSION, BUILD, BUNDLE_ID, MIN_MACOS, UPSTREAM
 
 
+def minimum_system(app):
+    """A plist cannot lower the deployment target of bundled Python libraries."""
+    versions = [tuple(map(int, MIN_MACOS.split(".")))]
+    for path in app.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        if path.suffix not in (".so", ".dylib") and path.name not in ("Python", NAME):
+            continue
+        result = subprocess.run(["vtool", "-show-build", str(path)], capture_output=True, text=True, check=True)
+        for value in re.findall(r"^\s*(?:minos|version)\s+(\d+(?:\.\d+)+)", result.stdout, re.M):
+            versions.append(tuple(map(int, value.split("."))))
+    return ".".join(map(str, max(versions)))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dmg", action="store_true", help="also build the download/installation disk image")
@@ -59,11 +73,12 @@ def main():
         "--hidden-import", "webview.platforms.cocoa", str(here / "秒薪.pyw"),
     ])
     app = here / "dist" / f"{NAME}.app"
+    minimum = minimum_system(app)
     info_path = app / "Contents" / "Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info.update({
         "CFBundleShortVersionString": VERSION, "CFBundleVersion": BUILD,
-        "LSMinimumSystemVersion": MIN_MACOS, "LSApplicationCategoryType": "public.app-category.finance",
+        "LSMinimumSystemVersion": minimum, "LSApplicationCategoryType": "public.app-category.finance",
         "CFBundleDevelopmentRegion": "zh_CN", "CFBundleLocalizations": ["zh_CN"],
         "NSHumanReadableCopyright": "秒薪 · 原项目 liumingshuo77-cmyk/miaoxin",
     })
@@ -81,12 +96,13 @@ def main():
         root = Path(staging)
         subprocess.run(["ditto", str(app), str(root / app.name)], check=True)
         (root / "Applications").symlink_to("/Applications")
-        shutil.copy2(here / "INSTALL-macOS.txt", root / "安装说明.txt")
+        instructions = (here / "INSTALL-macOS.txt").read_text(encoding="utf-8")
+        (root / "安装说明.txt").write_text(instructions.replace("macOS 15", "macOS " + minimum), encoding="utf-8")
         subprocess.run(["hdiutil", "create", "-volname", f"秒薪 {VERSION}", "-srcfolder", str(root),
                         "-format", "UDZO", "-ov", str(output)], check=True)
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     output.with_suffix(".dmg.sha256").write_text(f"{digest}  {output.name}\n", encoding="ascii")
-    manifest = {"version": VERSION, "build": BUILD, "architecture": arch, "minimum_macos": MIN_MACOS,
+    manifest = {"version": VERSION, "build": BUILD, "architecture": arch, "minimum_macos": minimum,
                 "repository": args.release_repo, "file": output.name, "sha256": digest,
                 "signature": "ad-hoc", "notarized": False}
     output.with_suffix(".manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
