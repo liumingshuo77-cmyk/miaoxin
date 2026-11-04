@@ -25,7 +25,7 @@
       --down: #e58a79;
       --down-bg: rgba(229, 138, 121, 0.12);
       --num: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-      --ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      --ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", -apple-system, "PingFang SC", sans-serif;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -92,6 +92,9 @@
     .tb-btn.text { letter-spacing: 0.24em; padding: 0 8px 0 12px; }
     body.on-back #openBack, body:not(.on-back) #openFront { display: none; }
     #openFront { color: var(--gold); }
+    /* macOS uses the native traffic lights and draggable title bar. */
+    :root[data-platform="darwin"] #winMin,
+    :root[data-platform="darwin"] #winClose { display: none; }
 
     /* 翻转 */
     .scene { position: absolute; inset: 42px 0 0; perspective: 1800px; }

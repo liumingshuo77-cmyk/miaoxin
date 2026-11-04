@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -17,14 +19,20 @@ import urllib.request
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 def _dirs():
     here = Path(__file__).resolve().parent
+    files = Path(getattr(sys, "_MEIPASS", here))
+    if os.environ.get("MIAOXIN_DATA_DIR"):
+        return Path(os.environ["MIAOXIN_DATA_DIR"]).expanduser().resolve(), files
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Miaoxin", files
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent, Path(getattr(sys, "_MEIPASS", here))
+        return Path(sys.executable).resolve().parent, files
     return here, here
 
 
@@ -62,12 +70,20 @@ class Cache:
 cache = Cache()
 
 
+@lru_cache(maxsize=1)
+def https_context():
+    # A frozen Mac app must not depend on a Homebrew/Python certificate path
+    # that only exists on the machine that built it.
+    import certifi
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def get_bytes(url, referer, timeout=8):
     req = urllib.request.Request(
         url,
         headers={"User-Agent": UA, "Referer": referer, "Accept": "*/*"},
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=https_context()) as resp:
         return resp.read()
 
 
@@ -451,6 +467,7 @@ def write_state(state):
     text = json.dumps(state, ensure_ascii=False, indent=2)
     if len(text.encode("utf-8")) > 1_000_000:
         raise ValueError("账本太大")
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE_PATH.with_suffix(".tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(STATE_PATH)

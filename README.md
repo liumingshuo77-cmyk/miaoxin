@@ -25,6 +25,41 @@ py -3w 秒薪.pyw
 py -3 build_exe.py
 ```
 
+### macOS
+
+Mac 版使用系统 WebKit，沿用同一套界面、工资计算和股票记账功能，支持原生标题栏、最小化、关闭和 `Command-Q` 退出。
+
+已有构建产物时，双击 `dist/秒薪.app`，也可以把它拖进「应用程序」。`.app` 自带 Python 和依赖，运行时不用安装 Python。
+
+从源码运行需要 Python 3.10 或更新版本。在项目目录执行：
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python 秒薪.pyw
+```
+
+也可以双击 `启动秒薪.command`：优先打开本目录已构建的 `.app`；否则创建项目内的 `.venv` 并安装运行依赖后启动。首次安装需要联网。
+
+在 Mac 上构建独立应用：
+
+```sh
+.venv/bin/python -m pip install -r requirements-build.txt
+.venv/bin/python build_mac.py
+open dist/秒薪.app
+```
+
+构建产物采用当前 Python 的架构。Apple Silicon 和 Intel 分别在对应架构的 Python 环境构建；这不是通用二进制。可运行的最低系统版本取决于构建时的 Python 和依赖，建议在目标系统验证。构建脚本使用本机临时签名，未配置 Apple Developer ID 签名或公证；从网上下载的应用可能被 Gatekeeper 拦截。确认来源后，可按系统提示在「系统设置 → 隐私与安全性」中允许打开，或自行从源码构建。
+
+开发验证：
+
+```sh
+node test_calc.js
+.venv/bin/python -m unittest discover -s tests
+# Mac 桌面会话中运行：实际打开两次 WebKit 窗口，验证保存、重启和退出
+.venv/bin/python tests/smoke_macos.py
+```
+
 ## 正面
 
 | 看到的 | 含义 |
@@ -80,4 +115,11 @@ py -3 build_exe.py
 
 ## 账本
 
-设置、打卡、开销、持仓和休假都写在程序旁边的 `state.json`。这个文件不会上传。换电脑时把它和 `秒薪.exe` 放在一起。
+设置、打卡、开销、持仓和休假都写在本机的 `state.json`，这个文件不会上传。
+
+- **Windows：** 仍在程序旁边。换电脑时把它和 `秒薪.exe` 放在一起。
+- **macOS：** 源码运行和 `.app` 共用 `~/Library/Application Support/Miaoxin/state.json`；退出应用后复制此文件即可备份。日志也在同一目录，更新或移动 `.app` 不会移动账本。在 Finder 中按 `Command-Shift-G`，粘贴 `~/Library/Application Support/Miaoxin` 即可打开目录。
+
+从 Windows 迁移时，先退出两边的秒薪，备份 Mac 现有账本，再把 Windows 的 `state.json` 复制到上述 Mac 目录。应用不会自动覆盖或合并旧账本。
+
+测试或使用独立账本时，可设置环境变量 `MIAOXIN_DATA_DIR` 指向另一目录；不会读取或迁移默认目录中的账本。

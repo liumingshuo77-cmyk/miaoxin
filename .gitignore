@@ -5,3 +5,6 @@ __pycache__/
 build/
 dist/
 *.spec
+.venv/
+.DS_Store
+*.app/

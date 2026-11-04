@@ -1270,6 +1270,7 @@ async function boot() {
     try {
       const data = await api.get_state();
       remote = data && data.state;
+      if (data && data.platform) document.documentElement.dataset.platform = data.platform;
     } catch (e) { remote = null; }
   }
   let local = null;
@@ -1286,6 +1287,11 @@ async function boot() {
   renderPositions();
   renderCalendar();
   tick();
+  // Native macOS close and Command-Q must also flush the debounced save.
+  window.miaoxinSnapshot = () => {
+    clearTimeout(saveTimer);
+    return JSON.parse(JSON.stringify(state));
+  };
   setInterval(tick, 100);
   refreshQuotes();
   setInterval(() => { if (!document.hidden) refreshQuotes(); }, 5000);
