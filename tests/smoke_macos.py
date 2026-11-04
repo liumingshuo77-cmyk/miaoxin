@@ -26,6 +26,8 @@ def child(phase):
     def exercise():
         window = webview.windows[0]
         try:
+            if not window.events.loaded.wait(60):
+                raise AssertionError(f"Page did not finish loading: shown={window.events.shown.is_set()}, url={window.real_url}")
             deadline = time.monotonic() + 30
             while not window.evaluate_js("typeof window.miaoxinSnapshot === 'function'"):
                 if time.monotonic() > deadline:
@@ -59,7 +61,8 @@ def child(phase):
             failures.append(traceback.format_exc())
             window.destroy()
 
-    webview.start = lambda **kwargs: start(exercise, **kwargs)
+    webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
+    webview.start = lambda **kwargs: start(exercise, debug=bool(os.environ.get("CI")), **kwargs)
     app["main"]()
     if failures:
         raise AssertionError("\n".join(failures))
@@ -74,7 +77,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="miaoxin-smoke-") as folder:
         env = dict(os.environ, MIAOXIN_DATA_DIR=folder)
         for phase, salary in (("close", "12345"), ("quit", "23456")):
-            subprocess.run([sys.executable, __file__, phase], env=env, check=True, timeout=60)
+            subprocess.run([sys.executable, __file__, phase], env=env, check=True, timeout=120)
             state = json.loads((Path(folder) / "state.json").read_text(encoding="utf-8"))
             assert state["salary"] == salary, state
             print(f"PASS: {phase}, saved salary {salary}", flush=True)
