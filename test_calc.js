@@ -11,6 +11,9 @@ const {
   spentThrough,
   rentPerDay,
   rentThrough,
+  salePnl,
+  realizedOn,
+  realizedThrough,
 } = require("./app.js");
 
 let failed = 0;
@@ -124,6 +127,16 @@ assertClose(rentThrough(2026, 11, "2026-11-04", { rent: "3000" }), 400, "rent th
 assertClose(rentThrough(2026, 11, "2026-11-30", { rent: "3000" }), 3000, "full month rent");
 assertClose(rentPerDay(2026, 2, { rent: "2800" }), 100, "february rent per day");
 assertClose(rentThrough(2026, 11, "2026-10-31", { rent: "3000" }), 0, "rent before month");
+
+const sold = { qty: "100", cost: "10", sell: "12.5", fx: 1, date: "2026-11-04" };
+assertClose(salePnl(sold), 250, "sale profit");
+assertClose(realizedOn([sold, { qty: "10", cost: "1", sell: "2", fx: 1, date: "2026-11-03" }], "2026-11-04"), 250, "realized today");
+assertClose(realizedThrough([
+  sold,
+  { qty: "10", cost: "1", sell: "3", fx: 1, date: "2026-11-01" },
+  { qty: "10", cost: "1", sell: "9", fx: 1, date: "2026-11-05" },
+  { qty: "10", cost: "1", sell: "9", fx: 1, date: "2026-10-31" },
+], 2026, 11, "2026-11-04"), 270, "realized through the 4th");
 
 assertClose(spentThrough({
   "2026-11-03": "40",

@@ -268,6 +268,7 @@ function freshState() {
     sessions: {},
     expenses: {},
     rent: "",
+    sales: [],
   };
 }
 function hydrate(raw) {
@@ -279,6 +280,7 @@ function hydrate(raw) {
   s.leaves = raw.leaves && typeof raw.leaves === "object" ? raw.leaves : {};
   s.sessions = raw.sessions && typeof raw.sessions === "object" ? raw.sessions : {};
   s.expenses = raw.expenses && typeof raw.expenses === "object" ? raw.expenses : {};
+  s.sales = Array.isArray(raw.sales) ? raw.sales : [];
   return s;
 }
 function repairSessions(state, now) {
@@ -369,6 +371,33 @@ function stockFigures() {
   }
   return { day: day, month: month, total: total, monthOk: monthOk, missingCost: missingCost, rows: rows };
 }
+function salePnl(sale) {
+  const cost = costOf(sale);
+  const sell = num(sale && sale.sell);
+  const qty = num(sale && sale.qty);
+  const fx = num(sale && sale.fx);
+  if (cost == null || !(sell > 0) || !(qty > 0) || !(fx > 0)) return null;
+  return (sell - cost) * qty * fx;
+}
+function realizedOn(sales, iso) {
+  let sum = 0;
+  for (const sale of sales || []) {
+    if (!sale || sale.date !== iso) continue;
+    const pnl = salePnl(sale);
+    if (pnl != null) sum += pnl;
+  }
+  return sum;
+}
+function realizedThrough(sales, y, m, todayIso) {
+  let sum = 0;
+  const prefix = y + "-" + pad(m) + "-";
+  for (const sale of sales || []) {
+    if (!sale || !sale.date || sale.date > todayIso || !sale.date.startsWith(prefix)) continue;
+    const pnl = salePnl(sale);
+    if (pnl != null) sum += pnl;
+  }
+  return sum;
+}
 function yesterdayKey(now) { return shiftDays(isoDate(now), -1); }
 function saveYesterdayFromInput(now) {
   const y = yesterdayKey(now || new Date());
@@ -429,10 +458,14 @@ function tick() {
   const ySpent = num(state.expenses[yKey]);
   const rentDay = rentPerDay(y, m, state);
   const rentSoFar = rentThrough(y, m, iso, state);
+  const realizedToday = realizedOn(state.sales, iso);
+  const realizedMonth = realizedThrough(state.sales, y, m, iso);
+  const stockDay = stock.day + realizedToday;
+  const stockMonth = stock.month + realizedMonth;
   const payToday = acc.pay;
-  const earnToday = payToday + stock.day - rentDay;
+  const earnToday = payToday + stockDay - rentDay;
   const monthPay = monthSalary(state, state.sessions, now);
-  const earnMonth = monthPay + stock.month - spent - rentSoFar;
+  const earnMonth = monthPay + stockMonth - spent - rentSoFar;
   const std = standardSeconds(state);
   const perSec = std > 0 ? dayRate(y, m, state) / std : 0;
   const weeks = ["日", "一", "二", "三", "四", "五", "六"];
@@ -449,16 +482,16 @@ function tick() {
   byId("dayState").textContent = dayStateText(iso);
   byId("hero").textContent = money(earnToday);
   byId("hero").className = "hero-num" + (earnToday < -0.005 ? " down" : "");
-  paintFood(stock.day);
+  paintFood(stockDay);
   byId("payToday").textContent = money(payToday);
   const stockNode = byId("stockToday");
-  stockNode.textContent = moneySigned(stock.day);
-  stockNode.className = stock.day > 0.005 ? "up" : stock.day < -0.005 ? "down" : "";
+  stockNode.textContent = moneySigned(stockDay);
+  stockNode.className = stockDay > 0.005 ? "up" : stockDay < -0.005 ? "down" : "";
   byId("monthEarn").textContent = money(earnMonth);
   byId("monthPay").textContent = money(monthPay);
   const ms = byId("monthStock");
-  ms.textContent = moneySigned(stock.month);
-  ms.className = stock.month > 0.005 ? "up" : stock.month < -0.005 ? "down" : "";
+  ms.textContent = moneySigned(stockMonth);
+  ms.className = stockMonth > 0.005 ? "up" : stockMonth < -0.005 ? "down" : "";
   byId("monthSpend").textContent = money(spent + rentSoFar);
   const rentInfo = byId("rentInfo");
   if (rentInfo) rentInfo.textContent = rentDay > 0.005 ? "房租 " + money(-rentDay) : "";
@@ -485,8 +518,8 @@ function tick() {
     : "";
 
   paintShift(now, acc, std);
-  paintStockEq(stock.day, perSec);
-  paintForecast(now, stock.month, spent);
+  paintStockEq(stockDay, perSec);
+  paintForecast(now, stockMonth, spent);
   paintBook(stock);
   paintSessions(iso);
   syncSpend(now, yKey, ySpent);
@@ -496,12 +529,12 @@ function tick() {
     iso + " 秒薪",
     "今日所赚 " + money(earnToday),
     "今日工资 " + money(payToday),
-    "今日股票 " + moneySigned(stock.day),
+    "今日股票 " + moneySigned(stockDay),
     "昨日开销 " + money(ySpent),
     "今日房租 " + money(rentDay),
     "本月所赚 " + money(earnMonth),
     "本月工资 " + money(monthPay),
-    "本月股票 " + moneySigned(stock.month),
+    "本月股票 " + moneySigned(stockMonth),
     "本月开销 " + money(spent + rentSoFar),
     "秒薪 " + moneyRate(perSec),
   ].join("\n");
@@ -705,18 +738,91 @@ function cls(n) {
   if (n < -0.005) return "down";
   return "";
 }
+function confirmSell(h, raw) {
+  const sell = num(raw);
+  const cost = costOf(h);
+  if (!(sell > 0)) {
+    byId("quoteStatus").textContent = "填写卖出价";
+    return;
+  }
+  if (cost == null) {
+    byId("quoteStatus").textContent = "先填成本";
+    return;
+  }
+  const q = quoteBook[h.symbol];
+  const currency = (q && q.currency) || "CNY";
+  const fx = currency === "CNY" ? ((q && q.fx) || 1) : (q && q.fx);
+  if (!(fx > 0)) {
+    byId("quoteStatus").textContent = "等行情换成人民币";
+    return;
+  }
+  const sale = {
+    id: Math.random().toString(36).slice(2, 10),
+    symbol: h.symbol,
+    name: h.name || (q && q.name) || h.symbol,
+    qty: String(h.qty),
+    cost: String(h.cost),
+    sell: String(raw).trim(),
+    fx: fx,
+    currency: currency,
+    date: isoDate(new Date()),
+  };
+  state.sales.push(sale);
+  state.holdings = state.holdings.filter((x) => x.id !== h.id);
+  const pnl = salePnl(sale);
+  byId("quoteStatus").textContent = "已结算 " + (pnl == null ? "" : moneySigned(pnl));
+  save(true);
+  renderPositions();
+  refreshQuotes();
+}
+function undoSale(sale) {
+  state.sales = state.sales.filter((x) => x.id !== sale.id);
+  if (!state.holdings.some((h) => h.symbol === sale.symbol)) {
+    state.holdings.push({
+      id: Math.random().toString(36).slice(2, 10),
+      symbol: sale.symbol,
+      name: sale.name,
+      qty: sale.qty,
+      cost: sale.cost,
+    });
+  }
+  save(true);
+  renderPositions();
+  refreshQuotes();
+}
+function renderSales(box) {
+  if (!state.sales.length) return;
+  const title = document.createElement("p");
+  title.className = "sold-title";
+  title.textContent = "已卖出";
+  box.append(title);
+  state.sales.slice().reverse().forEach((sale) => {
+    const row = document.createElement("div");
+    row.className = "sold";
+    const left = document.createElement("div");
+    const pnl = salePnl(sale);
+    left.textContent = (sale.name || sale.symbol) + "  " + sale.qty + "股  " + priceFmt(num(sale.sell));
+    const right = document.createElement("div");
+    right.className = "sold-side";
+    const gain = document.createElement("b");
+    gain.className = cls(pnl);
+    gain.textContent = pnl == null ? "—" : moneySigned(pnl);
+    const when = document.createElement("span");
+    when.className = "muted";
+    when.textContent = sale.date ? prettyDate(sale.date) : "";
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "link";
+    back.textContent = "撤销";
+    back.addEventListener("click", () => undoSale(sale));
+    right.append(gain, when, back);
+    row.append(left, right);
+    box.append(row);
+  });
+}
 function renderPositions() {
   const box = byId("positions");
   box.replaceChildren();
-  if (!state.holdings.length) return;
-  const head = document.createElement("div");
-  head.className = "pos head";
-  ["持仓", "现价", "今日", "本月", "相对成本", ""].forEach((t) => {
-    const s = document.createElement("span");
-    s.textContent = t;
-    head.append(s);
-  });
-  box.append(head);
   state.holdings.forEach((h) => {
     const row = document.createElement("div");
     row.className = "pos";
@@ -737,6 +843,35 @@ function renderPositions() {
     const day = span("day");
     const mon = span("mon");
     const all = span("all");
+    const actions = document.createElement("div");
+    actions.className = "pos-actions";
+    const sell = document.createElement("button");
+    sell.type = "button";
+    sell.className = "link";
+    sell.textContent = "已卖出";
+    sell.addEventListener("click", () => {
+      const open = row.querySelector(".sellbar");
+      if (open) { open.remove(); return; }
+      const bar = document.createElement("div");
+      bar.className = "sellbar";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.placeholder = "卖出价";
+      input.setAttribute("aria-label", "卖出价");
+      const q = quoteBook[h.symbol];
+      if (q && q.price > 0) input.value = String(q.price);
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "btn gold";
+      ok.textContent = "结算";
+      ok.addEventListener("click", () => confirmSell(h, input.value));
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmSell(h, input.value); });
+      bar.append(input, ok);
+      row.append(bar);
+      input.focus();
+      input.select();
+    });
     const del = document.createElement("button");
     del.type = "button";
     del.className = "link";
@@ -747,10 +882,12 @@ function renderPositions() {
       renderPositions();
       refreshQuotes();
     });
-    row.append(name, px, day, mon, all, del);
+    actions.append(sell, del);
+    row.append(name, px, day, mon, all, actions);
     box.append(row);
   });
-  fillQuoteCells();
+  renderSales(box);
+  if (state.holdings.length) fillQuoteCells();
 }
 function span(clsName) {
   const s = document.createElement("div");
@@ -818,7 +955,6 @@ async function refreshQuotes() {
   if (!state.holdings.length) {
     quoteBook = {};
     quoteError = "";
-    fillQuoteCells();
     return;
   }
   loadingQuotes = true;
@@ -1187,6 +1323,9 @@ if (typeof module !== "undefined" && module.exports) {
     spentThrough: spentThrough,
     rentPerDay: rentPerDay,
     rentThrough: rentThrough,
+    salePnl: salePnl,
+    realizedOn: realizedOn,
+    realizedThrough: realizedThrough,
     HOLIDAY_OFF: HOLIDAY_OFF,
     MAKEUP: MAKEUP,
   };

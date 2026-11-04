@@ -356,7 +356,13 @@
     .pos.head { display: none; }
     .pos > :first-child { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 8px; font-family: var(--ui); }
     .pos > :first-child .mini { grid-column: 1 / -1; }
-    .pos > button.link { grid-column: 2; justify-self: end; }
+    .pos-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 16px; }
+    .sellbar { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .sellbar input { height: 32px; }
+    .sellbar .btn { height: 32px; padding: 0 14px; flex: none; }
+    .sold-title { margin: 14px 0 0; font-size: 10px; letter-spacing: 0.32em; color: var(--gold); }
+    .sold { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 12px; }
+    .sold-side { display: flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .pos .px::before, .pos .day::before, .pos .mon::before, .pos .all::before { color: var(--muted); font-family: var(--ui); font-size: 11px; margin-right: 6px; letter-spacing: 0.1em; }
     .pos .px::before { content: "现价"; }
     .pos .day::before { content: "今日"; }
