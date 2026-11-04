@@ -313,19 +313,35 @@ let loadingQuotes = false;
 let viewYear = 0;
 let viewMonth = 1;
 let lastTitle = 0;
+let saveQueue = Promise.resolve();
+let generation = 0;
+let ledgerBlocked = false;
+
+function storageNotice(message, error) {
+  const node = byId("storageNotice");
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle("error", !!error);
+}
 
 function byId(id) { return document.getElementById(id); }
 function desktopApi() {
   return (typeof window !== "undefined" && window.pywebview && window.pywebview.api) || null;
 }
 function save(immediate) {
-  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  if (ledgerBlocked) return;
+  try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (e) { /* Disk ledger is authoritative. */ }
   clearTimeout(saveTimer);
   const send = () => {
     const api = desktopApi();
     if (!api) return;
     const payload = JSON.parse(JSON.stringify(state));
-    Promise.resolve(api.save_state(payload)).catch(() => {});
+    const revision = generation;
+    saveQueue = saveQueue.catch(() => {}).then(() => api.save_state(payload, revision)).then((result) => {
+      if (result && result.skipped) return;
+      if (!result || !result.ok) throw new Error((result && result.error) || "写入失败");
+      storageNotice("已保存到本机", false);
+    }).catch((error) => storageNotice("保存失败：" + error.message + "。请保留窗口并导出备份。", true));
   };
   if (immediate) send();
   else saveTimer = setTimeout(send, 400);
@@ -1214,9 +1230,32 @@ function bind() {
   const turn = (back) => {
     byId("flip").classList.toggle("is-back", back);
     document.body.classList.toggle("on-back", back);
+    document.querySelector(".face.front").inert = back;
+    document.querySelector(".face.back").inert = !back;
   };
+  turn(false);
   byId("openBack").addEventListener("click", () => turn(true));
   byId("openFront").addEventListener("click", () => turn(false));
+  byId("openTools").addEventListener("click", () => byId("toolsDialog").showModal());
+  byId("closeTools").addEventListener("click", () => byId("toolsDialog").close());
+  const actions = { exportBackup: "export_backup", importBackup: "import_backup", openData: "open_data_folder",
+    checkUpdates: "check_updates", openDownloads: "open_downloads", openFeedback: "open_feedback" };
+  for (const [id, method] of Object.entries(actions)) {
+    byId(id).addEventListener("click", async () => {
+      const button = byId(id);
+      button.disabled = true;
+      byId("toolsStatus").textContent = "正在处理…";
+      try {
+        const result = await desktopApi()[method]();
+        byId("toolsStatus").textContent = result.message || "完成";
+      } catch (error) {
+        byId("toolsStatus").textContent = "操作失败，请稍后重试：" + error.message;
+      } finally { button.disabled = false; }
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey && e.key === ",") { e.preventDefault(); turn(true); }
+  });
   const winMin = byId("winMin");
   if (winMin) winMin.addEventListener("click", () => { const api = desktopApi(); if (api) api.minimize(); });
   const winClose = byId("winClose");
@@ -1271,18 +1310,26 @@ async function boot() {
       const data = await api.get_state();
       remote = data && data.state;
       if (data && data.platform) document.documentElement.dataset.platform = data.platform;
-    } catch (e) { remote = null; }
+      generation = (data && data.generation) || 0;
+      ledgerBlocked = !!(data && data.error);
+      byId("appVersion").textContent = data.version ? "版本 " + data.version + " · 构建 " + data.build : "秒薪";
+      if (ledgerBlocked) storageNotice("账本读取失败，已停止写入。请在「数据与帮助」中恢复备份。", true);
+    } catch (e) {
+      ledgerBlocked = true;
+      storageNotice("无法连接账本，已停止写入。请退出后重新打开。", true);
+    }
   }
   let local = null;
   try { local = JSON.parse(localStorage.getItem(STATE_KEY) || "null"); } catch (e) { local = null; }
   try { quoteBook = JSON.parse(localStorage.getItem(QUOTE_KEY) || "{}"); } catch (e) { quoteBook = {}; }
-  state = hydrate(remote || local);
+  state = hydrate(ledgerBlocked ? null : (remote || local));
   const now = new Date();
   if (repairSessions(state, now) || (!remote && local)) save(true);
   viewYear = now.getFullYear();
   viewMonth = now.getMonth() + 1;
   buildDial();
   bind();
+  document.querySelector(".scene").inert = ledgerBlocked;
   fill();
   renderPositions();
   renderCalendar();
@@ -1292,6 +1339,20 @@ async function boot() {
     clearTimeout(saveTimer);
     return JSON.parse(JSON.stringify(state));
   };
+  window.miaoxinShowTools = () => byId("toolsDialog").showModal();
+  window.miaoxinReplaceState = (replacement, revision) => {
+    clearTimeout(saveTimer);
+    generation = revision;
+    state = hydrate(replacement);
+    ledgerBlocked = false;
+    document.querySelector(".scene").inert = false;
+    quoteBook = {};
+    spendShown = ""; punchShown = "";
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (e) {}
+    fill(); renderPositions(); renderCalendar(); tick(); refreshQuotes();
+    storageNotice("账本已恢复", false);
+  };
+  if (ledgerBlocked) byId("toolsDialog").showModal();
   setInterval(tick, 100);
   refreshQuotes();
   setInterval(() => { if (!document.hidden) refreshQuotes(); }, 5000);

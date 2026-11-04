@@ -1,0 +1,60 @@
+name: Release macOS
+
+on:
+  push:
+    tags: ['mac-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version
+        run: python -c 'import os; from app_info import VERSION; assert os.environ["GITHUB_REF_NAME"] == "mac-v" + VERSION'
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "秒薪 for macOS ${GITHUB_REF_NAME#mac-v}" --notes-file RELEASE_NOTES.md --draft
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements-build.txt
+      - run: python -m unittest discover -s tests
+      - run: node test_calc.js
+      - run: python tests/smoke_macos.py
+      - run: python build_mac.py --dmg --release-repo "${{ github.repository }}"
+      - name: Upload installer and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/*.sha256 dist/*.manifest.json -R "$GITHUB_REPOSITORY" --clobber
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish after both architectures pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft=false --latest

@@ -27,6 +27,13 @@ py -3 build_exe.py
 
 ### macOS
 
+从本仓库的 **Releases** 下载 Mac 安装文件（如果本仓库尚无 Release，维护者需先发布构建）。Apple Silicon 选 `arm64.dmg`，Intel 选 `x86_64.dmg`；系统要求 macOS 15 或更新版本。打开 DMG，把秒薪拖进 Applications，再从「应用程序」启动。无需安装 Python。
+
+右上角「⋯」进入「数据与帮助」：导出/恢复账本、打开数据目录、检查更新、反馈问题。`Command-,` 打开设置；原生关闭按钮、`Command-W` 或 `Command-Q` 会保存并退出。重复打开同一账本会激活已有实例。
+
+账本每天首次修改前自动备份，导入前额外备份。损坏或来自更新版本的账本不会被空白数据覆盖，界面会停止写入并提示恢复。自动备份位于数据目录下的 `backups`，不自动删除，请自行清理不再需要的旧备份。建议定期导出到另一存储位置。
+
+
 Mac 版使用系统 WebKit，沿用同一套界面、工资计算和股票记账功能，支持原生标题栏、最小化、关闭和 `Command-Q` 退出。
 
 已有构建产物时，双击 `dist/秒薪.app`，也可以把它拖进「应用程序」。`.app` 自带 Python 和依赖，运行时不用安装 Python。
@@ -45,9 +52,11 @@ python3 -m venv .venv
 
 ```sh
 .venv/bin/python -m pip install -r requirements-build.txt
-.venv/bin/python build_mac.py
+.venv/bin/python build_mac.py --dmg --release-repo OWNER/REPO
 open dist/秒薪.app
 ```
+
+`OWNER/REPO` 应替换为实际发布仓库；省略参数时指向原项目。产物中的更新与反馈入口使用此配置。
 
 构建产物采用当前 Python 的架构。Apple Silicon 和 Intel 分别在对应架构的 Python 环境构建；这不是通用二进制。可运行的最低系统版本取决于构建时的 Python 和依赖，建议在目标系统验证。构建脚本使用本机临时签名，未配置 Apple Developer ID 签名或公证；从网上下载的应用可能被 Gatekeeper 拦截。确认来源后，可按系统提示在「系统设置 → 隐私与安全性」中允许打开，或自行从源码构建。
 
@@ -123,3 +132,21 @@ node test_calc.js
 从 Windows 迁移时，先退出两边的秒薪，备份 Mac 现有账本，再把 Windows 的 `state.json` 复制到上述 Mac 目录。应用不会自动覆盖或合并旧账本。
 
 测试或使用独立账本时，可设置环境变量 `MIAOXIN_DATA_DIR` 指向另一目录；不会读取或迁移默认目录中的账本。
+
+## 维护与 GitHub 发布
+
+修改 `app_info.py` 的 `VERSION` / `BUILD` 并更新 `CHANGELOG.md`、`RELEASE_NOTES.md`。推送 `mac-v<版本号>` 标签后，Release 工作流先创建草稿，再分别在 Apple Silicon 与 Intel Mac 上测试和构建 DMG；两个架构成功后才转为公开 Release。失败时草稿不公开，修复并重新验证后再发布。
+
+构建产物包括 `.app`、拖拽安装 DMG、SHA-256 文件与 JSON 构建清单。检查下载文件：
+
+```sh
+shasum -a 256 -c Miaoxin-1.0.0-macOS-arm64.dmg.sha256
+```
+
+更新时退出秒薪，替换「应用程序」内的旧应用；保留独立账本目录。卸载只需退出后将应用移到废纸篓，账本仍然保留。如需清除个人数据，先备份再自行清理数据目录。详见 [安装说明](INSTALL-macOS.txt)。
+
+## 隐私与依赖
+
+无需登录，无广告或行为统计。工资、房租、打卡、股票数量/成本与开销只写入本机账本；查询行情会向腾讯证券/雅虎财经发送搜索词或股票代码。手动检查更新会访问发布仓库的 GitHub API。网络服务可看到正常请求的 IP 地址；应用不会将账本或日志自动上传。
+
+反馈时请勿公开完整账本。依赖来源见 [第三方组件说明](THIRD_PARTY_NOTICES.txt)，构建内包含可从依赖包收集到的许可文本。原项目的许可证由原作者决定，本适配不另行指定。

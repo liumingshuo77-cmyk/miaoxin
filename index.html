@@ -92,6 +92,21 @@
     .tb-btn.text { letter-spacing: 0.24em; padding: 0 8px 0 12px; }
     body.on-back #openBack, body:not(.on-back) #openFront { display: none; }
     #openFront { color: var(--gold); }
+    .storage-notice { position: fixed; bottom: 4px; left: 20px; right: 20px; z-index: 15; margin: 0;
+      font-size: 10px; color: var(--muted); pointer-events: none; }
+    .storage-notice:empty { display: none; }
+    .storage-notice.error { padding: 8px; background: var(--panel); color: var(--down); pointer-events: auto; }
+    dialog { width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 48px); overflow: auto;
+      background: var(--panel); color: var(--ink); border: 1px solid var(--hair2); border-radius: 16px; padding: 22px; }
+    dialog::backdrop { background: rgba(0, 0, 0, .6); }
+    dialog h2 { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+    dialog h3 { font-size: 12px; color: var(--gold); margin: 20px 0 8px; }
+    dialog p { font-size: 12px; color: var(--soft); margin: 8px 0; line-height: 1.7; }
+    .tool-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tool-actions .btn { flex: 1; white-space: nowrap; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #closeTools { float: right; }
+    @media (prefers-reduced-motion: reduce) { #flip { transition: none; } }
     /* macOS uses the native traffic lights and draggable title bar. */
     :root[data-platform="darwin"] #winMin,
     :root[data-platform="darwin"] #winClose { display: none; }
@@ -409,6 +424,7 @@
     </div>
     <button type="button" class="tb-btn text" id="openBack" title="设置">设置</button>
     <button type="button" class="tb-btn text" id="openFront" title="完成">完成</button>
+    <button type="button" class="tb-btn" id="openTools" title="数据与帮助" aria-label="数据与帮助">⋯</button>
     <button type="button" class="tb-btn" id="winMin" title="最小化" aria-label="最小化">
       <svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>
     </button>
@@ -577,6 +593,25 @@
       </section>
     </div>
   </div>
+  <p id="storageNotice" class="storage-notice" role="status" aria-live="polite"></p>
+  <dialog id="toolsDialog" aria-labelledby="toolsTitle">
+    <button type="button" class="tb-btn" id="closeTools" aria-label="关闭数据与帮助">✕</button>
+    <h2 id="toolsTitle">秒薪</h2>
+    <p id="appVersion"></p>
+    <p>把工资摊到每一秒。设置月薪与班次，再记下今日上下班时间；股票与房租会一起计入。</p>
+    <h3>账本与备份</h3>
+    <p>修改自动保存。每天首次修改前会保留一份旧账本，导入前另存备份。自动备份与账本在同一台电脑，建议定期导出到其他位置。</p>
+    <div class="tool-actions"><button class="btn" id="exportBackup">导出备份</button><button class="btn" id="importBackup">恢复备份…</button></div>
+    <p><button class="btn" id="openData">打开数据目录</button></p>
+    <h3>版本与支持</h3>
+    <div class="tool-actions"><button class="btn" id="checkUpdates">检查更新</button><button class="btn" id="openDownloads">下载新版</button></div>
+    <p>更新时退出应用，将新版拖进「应用程序」替换旧版，账本会保留。关闭窗口会保存并退出秒薪。</p>
+    <p><button class="btn" id="openFeedback">反馈问题</button></p>
+    <h3>隐私</h3>
+    <p>工资、房租、打卡、持仓数量与成本保存在本机，不上传。股票查询会向腾讯证券和雅虎财经发送搜索词或股票代码；手动检查更新会连接 GitHub。没有账号、广告或使用行为统计。</p>
+    <p>行情可能延迟，仅供个人记账。秒薪基于 liumingshuo77-cmyk/miaoxin；本构建的反馈与下载入口指向其发布仓库。</p>
+    <p id="toolsStatus" role="status" aria-live="polite"></p>
+  </dialog>
   <script src="app.js"></script>
 </body>
 </html>

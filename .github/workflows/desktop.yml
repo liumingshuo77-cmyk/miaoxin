@@ -3,7 +3,7 @@ name: Desktop checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   workflow_dispatch:
 
 permissions:
@@ -12,8 +12,9 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-15, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -27,4 +28,6 @@ jobs:
       - run: python -m unittest discover -s tests
       - run: node test_calc.js
       - if: runner.os == 'macOS'
-        run: python build_mac.py
+        run: python tests/smoke_macos.py
+      - if: runner.os == 'macOS'
+        run: python build_mac.py --dmg --release-repo "${{ github.repository }}"

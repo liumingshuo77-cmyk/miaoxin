@@ -23,6 +23,7 @@ from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from ledger import Ledger
 
 def _dirs():
     here = Path(__file__).resolve().parent
@@ -454,23 +455,11 @@ def quote_payload(qs):
 
 
 def read_state():
-    if not STATE_PATH.exists():
-        return None
-    try:
-        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return data if isinstance(data, dict) else None
+    return Ledger(STATE_PATH).load()
 
 
 def write_state(state):
-    text = json.dumps(state, ensure_ascii=False, indent=2)
-    if len(text.encode("utf-8")) > 1_000_000:
-        raise ValueError("账本太大")
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE_PATH.with_suffix(".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    tmp.replace(STATE_PATH)
+    Ledger(STATE_PATH).save(state)
 
 
 class Handler(BaseHTTPRequestHandler):
