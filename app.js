@@ -438,7 +438,13 @@ function tick() {
   const weeks = ["日", "一", "二", "三", "四", "五", "六"];
   const clockText = pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
   const clock = byId("clock");
-  if (clock) clock.textContent = clockText;
+  if (clock && clock.dataset.t !== clockText) {
+    const sec = document.createElement("span");
+    sec.className = "sec";
+    sec.textContent = clockText.slice(5);
+    clock.replaceChildren(clockText.slice(0, 5), sec);
+    clock.dataset.t = clockText;
+  }
   byId("todayLabel").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日 周" + weeks[now.getDay()];
   byId("dayState").textContent = dayStateText(iso);
   byId("hero").textContent = money(earnToday);
@@ -464,6 +470,8 @@ function tick() {
     live.hidden = false;
     live.className = "on";
   } else live.hidden = true;
+  const liveText = byId("liveText");
+  if (liveText) liveText.textContent = accruing(now) ? "计薪中" : inLunch(now) ? "午休" : "";
 
   byId("secLine").textContent = num(state.salary) > 0
     ? money(perSec * 3600) + "/时 · " + moneyRate(perSec) + "/秒"
@@ -522,27 +530,70 @@ function paintFood(day) {
   else node.removeAttribute("data-word");
   node.className = "food" + (up ? " up" : down ? " down" : "");
 }
+const DIAL_R = 104;
+const DIAL_SWEEP = 300;
+const DIAL_TICKS = 60;
+const DIAL_ARC = 2 * Math.PI * DIAL_R * DIAL_SWEEP / 360;
+let dialShown = -1;
+function buildDial() {
+  const group = byId("dialTicks");
+  if (!group || group.childNodes.length) return;
+  const ns = "http://www.w3.org/2000/svg";
+  for (let i = 0; i <= DIAL_TICKS; i += 1) {
+    const a = (120 + DIAL_SWEEP * i / DIAL_TICKS) * Math.PI / 180;
+    const major = i % 5 === 0;
+    const r1 = major ? 113 : 115;
+    const r2 = 120;
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("x1", (120 + r1 * Math.cos(a)).toFixed(2));
+    line.setAttribute("y1", (120 + r1 * Math.sin(a)).toFixed(2));
+    line.setAttribute("x2", (120 + r2 * Math.cos(a)).toFixed(2));
+    line.setAttribute("y2", (120 + r2 * Math.sin(a)).toFixed(2));
+    if (major) line.setAttribute("class", "major");
+    group.append(line);
+  }
+  for (const id of ["dialTrack", "dialArc"]) {
+    const node = byId(id);
+    if (node) node.setAttribute("stroke-dasharray", DIAL_ARC.toFixed(2) + " 9999");
+  }
+}
+function setProgress(pct) {
+  const p = Math.max(0, Math.min(100, pct));
+  const bar = byId("barFill");
+  if (bar) bar.style.width = p + "%";
+  const rounded = Math.round(p * 10) / 10;
+  if (rounded === dialShown) return;
+  dialShown = rounded;
+  const arc = byId("dialArc");
+  if (arc) arc.setAttribute("stroke-dashoffset", (DIAL_ARC * (1 - p / 100)).toFixed(2));
+  const ticks = byId("dialTicks");
+  if (ticks) {
+    const lit = Math.floor(p / 100 * DIAL_TICKS + 1e-6);
+    ticks.childNodes.forEach((t, i) => t.classList.toggle("on", p > 0 && i <= lit));
+  }
+  const label = byId("dialPct");
+  if (label) label.textContent = Math.round(p) + "%";
+}
 function paintShift(now, acc, std) {
   const iso = isoDate(now);
-  const bar = byId("barFill");
   const line = byId("shiftLine");
   if (acc.kind === "paid") {
-    bar.style.width = "100%";
+    setProgress(100);
     line.textContent = "带薪";
     return;
   }
   if (acc.kind === "unpaid") {
-    bar.style.width = "0%";
+    setProgress(0);
     line.textContent = "无薪";
     return;
   }
   if (acc.kind === "off") {
-    bar.style.width = acc.extraSec > 0 ? "100%" : "0%";
+    setProgress(acc.extraSec > 0 ? 100 : 0);
     line.textContent = acc.extraSec > 0 ? "加班 " + fmtDur(acc.extraSec) : "";
     return;
   }
   const pct = std > 0 ? Math.min(100, acc.shiftSec / std * 100) : 0;
-  bar.style.width = pct + "%";
+  setProgress(pct);
   const segs = state.sessions[iso] || [];
   const open = segs.some((s) => !s.end);
   if (!segs.length) {
@@ -1024,8 +1075,22 @@ function bind() {
     const otLabel = byId("otLabel");
     if (otLabel) otLabel.textContent = otMult(state).toFixed(1) + " 倍";
   });
-  byId("openBack").addEventListener("click", () => byId("flip").classList.add("is-back"));
-  byId("openFront").addEventListener("click", () => byId("flip").classList.remove("is-back"));
+  const turn = (back) => {
+    byId("flip").classList.toggle("is-back", back);
+    document.body.classList.toggle("on-back", back);
+  };
+  byId("openBack").addEventListener("click", () => turn(true));
+  byId("openFront").addEventListener("click", () => turn(false));
+  const winMin = byId("winMin");
+  if (winMin) winMin.addEventListener("click", () => { const api = desktopApi(); if (api) api.minimize(); });
+  const winClose = byId("winClose");
+  if (winClose) {
+    winClose.addEventListener("click", () => {
+      save(true);
+      const api = desktopApi();
+      if (api) setTimeout(() => api.close(), 150);
+    });
+  }
   byId("prevMonth").addEventListener("click", () => {
     viewMonth -= 1;
     if (viewMonth < 1) { viewMonth = 12; viewYear -= 1; }
@@ -1040,7 +1105,7 @@ function bind() {
     try {
       await navigator.clipboard.writeText(latestSummary);
       byId("copyBtn").textContent = "已复制";
-      setTimeout(() => { byId("copyBtn").textContent = "复制"; }, 1500);
+      setTimeout(() => { byId("copyBtn").textContent = "复制今日小结"; }, 1500);
     } catch (e) {
       byId("copyBtn").textContent = "复制失败";
     }
@@ -1079,6 +1144,7 @@ async function boot() {
   if (repairSessions(state, now) || (!remote && local)) save(true);
   viewYear = now.getFullYear();
   viewMonth = now.getMonth() + 1;
+  buildDial();
   bind();
   fill();
   renderPositions();

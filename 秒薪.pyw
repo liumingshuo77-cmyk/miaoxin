@@ -9,6 +9,7 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
+import ctypes
 import traceback
 from threading import Lock
 
@@ -21,6 +22,9 @@ LOCK = Lock()
 
 
 class Api:
+    def __init__(self):
+        self._window = None
+
     def get_state(self):
         return {"state": read_state()}
 
@@ -40,19 +44,44 @@ class Api:
     def search(self, q):
         return {"matches": resolve(q or "")}
 
+    def minimize(self):
+        if self._window:
+            self._window.minimize()
+
+    def close(self):
+        if self._window:
+            self._window.destroy()
+
+
+def round_corners(window):
+    try:
+        hwnd = int(str(window.native.Handle))
+        DWMWA_WINDOW_CORNER_PREFERENCE = 33
+        DWMWCP_ROUND = ctypes.c_int(2)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(DWMWCP_ROUND), ctypes.sizeof(DWMWCP_ROUND)
+        )
+    except Exception:
+        pass
+
 
 def main():
-    webview.create_window(
+    api = Api()
+    window = webview.create_window(
         "秒薪",
         url=(FILE_ROOT / "index.html").as_uri(),
-        js_api=Api(),
-        width=440,
-        height=760,
-        min_size=(400, 620),
-        background_color="#E9E2D6",
+        js_api=api,
+        width=420,
+        height=712,
+        min_size=(400, 680),
+        background_color="#111110",
+        frameless=True,
         easy_drag=False,
+        shadow=True,
         text_select=True,
     )
+    api._window = window
+    window.events.shown += lambda: round_corners(window)
     try:
         webview.start(gui="edgechromium")
     except Exception:

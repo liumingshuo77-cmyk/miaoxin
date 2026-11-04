@@ -5,337 +5,565 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>秒薪</title>
   <style>
-    :root { color-scheme: light; }
+    :root {
+      color-scheme: dark;
+      --bg: #111110;
+      --bg2: #161514;
+      --panel: #1a1918;
+      --field: #232120;
+      --field-hi: #2b2927;
+      --hair: rgba(255, 245, 230, 0.07);
+      --hair2: rgba(255, 245, 230, 0.12);
+      --ink: #efe9df;
+      --soft: #bdb5a9;
+      --muted: #7f786e;
+      --faint: #57524b;
+      --gold: #d2b47c;
+      --gold-dim: rgba(210, 180, 124, 0.16);
+      --up: #7cc49a;
+      --up-bg: rgba(124, 196, 154, 0.12);
+      --down: #e58a79;
+      --down-bg: rgba(229, 138, 121, 0.12);
+      --num: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      --ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
       margin: 0;
-      background: #e9e2d6;
-      color: #221f1b;
-      font: 15px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(120% 60% at 50% 0%, #1d1b18 0%, var(--bg) 60%);
+      color: var(--ink);
+      font: 13px/1.5 var(--ui);
       overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
     }
-    h1, h2, p { margin: 0; }
-    h1 {
-      font-family: "Palatino Linotype", Palatino, "Songti SC", Georgia, serif;
-      font-size: 28px;
-      font-weight: 500;
-      letter-spacing: 0.18em;
-    }
-    h2 { font-size: 14px; font-weight: 650; letter-spacing: 0.1em; }
+    input { user-select: text; }
+    h2, p, dl, dd { margin: 0; }
     button, input { font: inherit; color: inherit; }
-    button { background: transparent; border: 1px solid #cfc6b8; padding: 7px 10px; cursor: pointer; }
-    button.quiet { border: none; padding: 4px 0; letter-spacing: 0.12em; color: #6f675e; }
-    button.link { border: none; padding: 0; color: #6f675e; }
-    button:focus-visible, input:focus-visible { outline: 2px solid #221f1b; outline-offset: 2px; }
-    input[type="text"], input[type="time"] {
-      width: 100%;
-      background: transparent;
-      border: none;
-      border-bottom: 1px solid #cfc6b8;
-      border-radius: 0;
-      padding: 6px 0;
-      font-size: 16px;
-    }
-    input[type="range"] { width: 100%; accent-color: #221f1b; margin: 10px 0 0; }
-    input:focus { outline: none; border-bottom-color: #221f1b; }
-    .muted { color: #6f675e; }
-    .up { color: #1d6b45; }
-    .down { color: #8f3d32; }
-    #fatal { position: absolute; z-index: 5; left: 16px; right: 16px; top: 8px; color: #8f3d32; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .muted { color: var(--muted); }
+    #fatal { position: absolute; z-index: 20; left: 16px; right: 16px; top: 48px; color: var(--down); }
     #fatal:empty { display: none; }
+    .num { font-family: var(--num); font-variant-numeric: tabular-nums; }
 
-    .scene { height: 100%; perspective: 1400px; }
+    /* 标题栏 */
+    .titlebar {
+      position: relative;
+      z-index: 10;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 6px 0 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; flex: 1; height: 100%; }
+    .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .brand b { font-size: 12px; font-weight: 500; letter-spacing: 0.4em; color: var(--soft); }
+    .tb-btn {
+      height: 30px;
+      min-width: 34px;
+      padding: 0 10px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tb-btn:hover { background: rgba(255, 245, 230, 0.06); color: var(--ink); }
+    .tb-btn.close:hover { background: #b6402f; color: #fff; }
+    .tb-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.3; }
+    .tb-btn.text { letter-spacing: 0.24em; padding: 0 8px 0 12px; }
+    body.on-back #openBack, body:not(.on-back) #openFront { display: none; }
+    #openFront { color: var(--gold); }
+
+    /* 翻转 */
+    .scene { position: absolute; inset: 42px 0 0; perspective: 1800px; }
     #flip {
       position: relative;
       height: 100%;
       transform-style: preserve-3d;
-      transition: transform 0.55s ease;
+      transition: transform 0.7s cubic-bezier(0.3, 0.1, 0.15, 1);
     }
     #flip.is-back { transform: rotateY(180deg); }
-    .face {
-      position: absolute;
-      inset: 0;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
+    .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
     .face.back { transform: rotateY(180deg); }
     #flip.is-back .front { pointer-events: none; }
     #flip:not(.is-back) .back { pointer-events: none; }
-    .sheet { height: 100%; overflow: auto; padding: 22px 22px 40px; }
+    .sheet { height: 100%; overflow-y: auto; padding: 0 20px 12px; }
+    .sheet::-webkit-scrollbar { width: 6px; }
+    .sheet::-webkit-scrollbar-thumb { background: #2c2a27; border-radius: 6px; }
 
-    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-    .label { color: #6f675e; letter-spacing: 0.08em; font-size: 13px; margin-top: 26px; }
+    /* 表盘 */
+    .dial { position: relative; width: 240px; height: 240px; margin: 2px auto 0; }
+    .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    #dialTicks line { stroke: var(--faint); stroke-width: 1; stroke-linecap: round; transition: stroke 0.4s; }
+    #dialTicks line.major { stroke: #6b655c; stroke-width: 1.4; }
+    #dialTicks line.on { stroke: var(--gold); }
+    #dialTrack { fill: none; stroke: rgba(255, 245, 230, 0.05); stroke-width: 3; }
+    #dialArc {
+      fill: none;
+      stroke: url(#gold);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s ease;
+      filter: drop-shadow(0 0 6px rgba(210, 180, 124, 0.35));
+    }
+    .dial-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 6px;
+    }
+    .dial-date { font-size: 11px; letter-spacing: 0.18em; color: var(--muted); }
     .clock {
-      margin-top: 22px;
-      font-family: "Palatino Linotype", Palatino, Georgia, serif;
-      font-size: 56px;
-      font-weight: 500;
-      line-height: 1;
-      letter-spacing: -0.04em;
-      font-variant-numeric: tabular-nums;
-    }
-    .hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-    .hero-num {
-      font-family: "Palatino Linotype", Palatino, Georgia, serif;
-      font-size: 44px;
-      font-weight: 500;
-      line-height: 1.05;
       margin-top: 4px;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.03em;
-    }
-    .food {
-      margin: 0;
-      font-size: 42px;
+      font-family: var(--num);
+      font-size: 50px;
+      font-weight: 200;
       line-height: 1;
+      letter-spacing: 0.01em;
+      font-variant-numeric: tabular-nums;
+    }
+    .clock .sec { font-size: 18px; font-weight: 300; color: var(--muted); margin-left: 2px; letter-spacing: 0; }
+    .dial-state { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: var(--soft); letter-spacing: 0.12em; }
+    #dayState { padding: 2px 9px; border: 1px solid var(--hair2); border-radius: 999px; }
+    #live { width: 6px; height: 6px; border-radius: 50%; background: var(--up); box-shadow: 0 0 8px var(--up); }
+    #live[hidden] { display: none; }
+    #live.on { animation: pulse 1.8s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.25; } }
+    #liveText:empty { display: none; }
+    .dial-pct {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 14px;
       text-align: center;
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.12em;
+    }
+
+    /* 今日 */
+    .today { text-align: center; margin-top: 4px; }
+    .caption { font-size: 11px; letter-spacing: 0.32em; color: var(--muted); }
+    .hero-line { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 4px; }
+    .hero-num {
+      font-family: var(--num);
+      font-size: 40px;
+      font-weight: 300;
+      line-height: 1.15;
+      letter-spacing: 0.005em;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .hero-num.down { color: var(--down); }
+    .food {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 26px;
+      padding: 0 10px 0 7px;
+      border-radius: 999px;
+      font-size: 15px;
+      line-height: 1;
+      white-space: nowrap;
     }
     .food:empty { display: none; }
-    .food::after {
-      content: attr(data-word);
-      display: block;
-      margin-top: 4px;
-      font-size: 13px;
-      letter-spacing: 0.18em;
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    .food.up { background: var(--up-bg); }
+    .food.down { background: var(--down-bg); }
+    .food::after { content: attr(data-word); font-size: 11px; letter-spacing: 0.12em; }
+    .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .chips p:empty { display: none; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 16px;
+      border-top: 1px solid var(--hair);
+      border-bottom: 1px solid var(--hair);
     }
-    #live {
-      display: inline-block;
-      width: 7px;
-      height: 7px;
-      margin-right: 8px;
-      border-radius: 50%;
-      background: #1d6b45;
-      vertical-align: middle;
-    }
-    #live[hidden] { display: none; }
-    #live.on { animation: pulse 1.6s ease-in-out infinite; }
-    @keyframes pulse { 50% { opacity: 0.3; } }
-    .stats, .ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 16px; }
-    .stats div, .ledger div { border-top: 1px solid #d9d0c3; padding-top: 8px; }
-    .stats span, .ledger dt { display: block; color: #6f675e; font-size: 12px; letter-spacing: 0.04em; }
-    .stats b, .ledger dd {
+    .metrics > div { padding: 11px 0 10px; text-align: center; }
+    .metrics > div + div { border-left: 1px solid var(--hair); }
+    .k { display: block; font-size: 10px; letter-spacing: 0.3em; color: var(--muted); }
+    .v {
       display: block;
-      margin: 2px 0 0;
-      font-weight: 500;
-      font-size: 22px;
-      font-family: "Palatino Linotype", Palatino, Georgia, serif;
+      margin-top: 3px;
+      font-family: var(--num);
+      font-size: 19px;
+      font-weight: 400;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
-    .bar { height: 4px; background: #ddd6ca; margin-top: 18px; }
-    .bar > div { height: 100%; width: 0; background: #221f1b; }
-    .stack { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-    .block { margin-top: 26px; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 14px; }
-    .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; letter-spacing: 0.04em; color: #6f675e; }
-    .ot-row { display: flex; align-items: center; gap: 12px; }
-    .ot-row b { min-width: 52px; font-weight: 650; color: #221f1b; font-variant-numeric: tabular-nums; }
-    .checks { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 14px; }
-    .checks label { display: flex; gap: 6px; align-items: center; }
-    .row-actions { display: flex; gap: 8px; align-items: end; margin-top: 12px; }
-    .adder { display: grid; grid-template-columns: 1fr 72px 72px auto; gap: 10px; align-items: end; margin-top: 12px; }
+    .sub { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .bar { display: none; }
+
+    /* 本月 */
+    .month { margin-top: 16px; padding: 14px 16px 12px; border: 1px solid var(--hair); border-radius: 14px; background: rgba(255, 245, 230, 0.02); }
+    .month-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .month-head .caption { letter-spacing: 0.32em; }
+    #forecast { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .ledger { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 0; margin-top: 4px; }
+    .ledger div:first-child { grid-column: 1 / -1; }
+    .ledger div:first-child dt { display: none; }
+    .ledger div:first-child dd { font-size: 28px; font-weight: 300; color: var(--ink); }
+    .ledger div:not(:first-child) { padding-top: 10px; border-top: 1px solid var(--hair); }
+    .ledger div + div + div { padding-left: 12px; border-left: 1px solid var(--hair); }
+    .ledger dt { font-size: 10px; letter-spacing: 0.3em; color: var(--muted); }
+    .ledger dd {
+      margin-top: 2px;
+      font-family: var(--num);
+      font-size: 14px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    #bookTotal { margin-top: 8px; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    #bookTotal:empty { display: none; }
+
+    /* 设置 */
+    .back .sheet { padding-top: 4px; display: flex; flex-direction: column; gap: 10px; }
+    .back .sheet > * { flex-shrink: 0; }
+    .card { background: var(--panel); border: 1px solid var(--hair); border-radius: 14px; padding: 16px; }
+    .section-title { font-size: 10px; font-weight: 500; color: var(--gold); letter-spacing: 0.36em; margin-bottom: 12px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 10px; }
+    .card > .grid2 + .grid2, .card > .grid2 + .field, .card > .field + .grid2, .card > .field + .field { margin-top: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; }
+    input[type="text"], input[type="time"] {
+      width: 100%;
+      height: 36px;
+      padding: 0 12px;
+      background: var(--field);
+      border: 1px solid transparent;
+      border-radius: 9px;
+      font-family: var(--num);
+      font-size: 14px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    input[type="text"]:hover, input[type="time"]:hover { background: var(--field-hi); }
+    input[type="text"]:focus, input[type="time"]:focus { outline: none; border-color: rgba(210, 180, 124, 0.6); background: var(--field-hi); }
+    input::placeholder { color: var(--faint); }
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.8); opacity: 0.3; cursor: pointer; }
+    input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 0.7; }
+    .hint { margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .hint:empty { display: none; }
+    .btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 9px;
+      border: 1px solid var(--hair2);
+      background: transparent;
+      color: var(--soft);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn:hover { background: rgba(255, 245, 230, 0.05); color: var(--ink); }
+    .btn.gold { background: var(--gold); border-color: var(--gold); color: #1a1714; font-weight: 600; }
+    .btn.gold:hover { background: #dcc08c; }
+    .row-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .ot-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; }
+    .ot-head b { font-family: var(--num); font-size: 15px; font-weight: 400; color: var(--gold); letter-spacing: 0; }
+    input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 4px 0 0; background: transparent; }
+    input[type="range"]::-webkit-slider-runnable-track { height: 2px; border-radius: 2px; background: #34312d; }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      margin-top: -6px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 0 4px rgba(210, 180, 124, 0.15);
+    }
+    .ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); font-family: var(--num); }
+    .checks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .checks label { position: relative; }
+    .checks input { position: absolute; opacity: 0; pointer-events: none; }
+    .checks span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid var(--hair2);
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .checks span:hover { color: var(--ink); }
+    .checks input:checked + span { background: var(--gold-dim); border-color: rgba(210, 180, 124, 0.5); color: var(--gold); }
+    .checks input:focus-visible + span { outline: 1px solid var(--gold); outline-offset: 2px; }
+    .checks.days { justify-content: space-between; }
+    .checks.days span { width: 36px; padding: 0; }
+
+    /* 持仓 */
+    .adder { display: grid; grid-template-columns: 1fr 66px 66px auto; gap: 8px; align-items: end; margin-top: 12px; }
     .suggest-wrap { position: relative; }
     #suggest {
       position: absolute;
-      z-index: 3;
+      z-index: 5;
       left: 0;
-      right: 0;
-      top: 100%;
-      background: #f6f1e8;
-      border: 1px solid #d9d0c3;
+      right: -150px;
+      top: calc(100% + 4px);
+      background: #24221f;
+      border: 1px solid var(--hair2);
+      border-radius: 10px;
+      box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.6);
       max-height: 220px;
       overflow: auto;
+      padding: 4px;
     }
     #suggest[hidden] { display: none; }
-    #suggest button { display: block; width: 100%; text-align: left; border: none; border-top: 1px solid #e5ddd0; background: transparent; }
+    #suggest button { display: block; width: 100%; text-align: left; border: none; border-radius: 7px; background: transparent; padding: 8px 10px; color: var(--soft); }
+    #suggest button:hover { background: rgba(255, 245, 230, 0.06); color: var(--ink); }
+    #positions:empty { display: none; }
     .pos {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 2px 12px;
+      gap: 4px 12px;
       align-items: center;
       padding: 12px 0;
-      border-top: 1px solid #d9d0c3;
-    }
-    .pos.head { display: none; }
-    .pos > :first-child { grid-column: 1 / -1; }
-    .pos .px::before, .pos .day::before, .pos .mon::before, .pos .all::before {
-      color: #6f675e;
+      border-bottom: 1px solid var(--hair);
       font-size: 12px;
+      font-family: var(--num);
+      font-variant-numeric: tabular-nums;
     }
-    .pos .px::before { content: "现价 "; }
-    .pos .day::before { content: "今日 "; }
-    .pos .mon::before { content: "本月 "; }
-    .pos .all::before { content: "成本 "; }
-    .nm { font-weight: 650; }
-    .mini { display: flex; gap: 14px; margin-top: 4px; }
-    .mini label { font-size: 12px; color: #6f675e; }
-    .mini input { width: 84px; font-size: 14px; }
-    .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 8px; }
-    .dow { font-size: 12px; color: #6f675e; text-align: center; padding: 4px 0; }
-    .cal button {
-      min-height: 46px;
-      text-align: left;
-      padding: 4px;
-      border: 1px solid transparent;
-      background: transparent;
-    }
-    .cal button.today { border-color: #221f1b; }
-    .cal .d { display: block; font-variant-numeric: tabular-nums; }
-    .cal .k { display: block; font-size: 11px; line-height: 1.2; }
-    .tag-paid { color: #8a5a2a; }
-    .tag-unpaid { color: #8f3d32; }
-    .tag-off { color: #6f675e; }
-    .foot { margin-top: 22px; font-size: 12px; color: #6f675e; }
+    .pos:first-child { padding-top: 0; }
+    .pos.head { display: none; }
+    .pos > :first-child { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 8px; font-family: var(--ui); }
+    .pos > :first-child .mini { grid-column: 1 / -1; }
+    .pos > button.link { grid-column: 2; justify-self: end; }
+    .pos .px::before, .pos .day::before, .pos .mon::before, .pos .all::before { color: var(--muted); font-family: var(--ui); font-size: 11px; margin-right: 6px; letter-spacing: 0.1em; }
+    .pos .px::before { content: "现价"; }
+    .pos .day::before { content: "今日"; }
+    .pos .mon::before { content: "本月"; }
+    .pos .all::before { content: "成本"; }
+    .nm { font-weight: 500; font-size: 13px; color: var(--ink); }
+    .mini { display: flex; gap: 10px; margin-top: 6px; }
+    .mini label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+    .mini input[type="text"] { width: 92px; height: 28px; font-size: 12px; padding: 0 8px; }
+    button.link { border: none; background: transparent; padding: 4px 0; color: var(--muted); font-size: 11px; letter-spacing: 0.1em; }
+    button.link:hover { color: var(--down); }
+
+    /* 日历 */
+    .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .cal-head .section-title { margin: 0; }
+    .cal-nav { display: flex; align-items: center; gap: 2px; }
+    .cal-nav p { min-width: 86px; text-align: center; font-size: 12px; color: var(--soft); font-family: var(--num); }
+    .icon-btn { width: 26px; height: 26px; border: none; border-radius: 7px; background: transparent; color: var(--muted); display: grid; place-items: center; }
+    .icon-btn:hover { background: rgba(255, 245, 230, 0.06); color: var(--ink); }
+    .icon-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .dow { font-size: 10px; color: var(--faint); text-align: center; padding: 2px 0 6px; }
+    .cal button { min-height: 42px; padding: 5px 0 4px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: center; color: var(--soft); }
+    .cal button:hover { background: rgba(255, 245, 230, 0.05); }
+    .cal button.today { border-color: rgba(210, 180, 124, 0.6); }
+    .cal .d { display: block; font-size: 12px; font-family: var(--num); font-variant-numeric: tabular-nums; }
+    .cal .k { display: block; font-size: 9px; line-height: 1.3; letter-spacing: 0.04em; color: var(--faint); }
+    .cal .k.tag-work { color: var(--muted); }
+    .cal .k.tag-paid { color: var(--gold); }
+    .cal .k.tag-unpaid { color: var(--down); }
+    .legal { font-size: 10px; color: var(--faint); text-align: center; letter-spacing: 0.06em; }
   </style>
 </head>
 <body>
   <p id="fatal"></p>
+
+  <header class="titlebar pywebview-drag-region">
+    <div class="brand pywebview-drag-region">
+      <span class="mark">秒</span>
+      <b>秒薪</b>
+    </div>
+    <button type="button" class="tb-btn text" id="openBack" title="设置">设置</button>
+    <button type="button" class="tb-btn text" id="openFront" title="完成">完成</button>
+    <button type="button" class="tb-btn" id="winMin" title="最小化" aria-label="最小化">
+      <svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>
+    </button>
+    <button type="button" class="tb-btn close" id="winClose" title="关闭" aria-label="关闭">
+      <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>
+    </button>
+  </header>
+
   <div class="scene">
     <div id="flip">
       <section class="face front">
         <div class="sheet">
-          <div class="top">
-            <h1>秒薪</h1>
-            <button type="button" class="quiet" id="openBack">设置</button>
+          <div class="dial">
+            <svg viewBox="0 0 240 240" aria-hidden="true">
+              <defs>
+                <linearGradient id="gold" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0" stop-color="#9c7f4c"/>
+                  <stop offset="1" stop-color="#ead1a0"/>
+                </linearGradient>
+              </defs>
+              <g id="dialTicks"></g>
+              <circle id="dialTrack" cx="120" cy="120" r="104" transform="rotate(120 120 120)"/>
+              <circle id="dialArc" cx="120" cy="120" r="104" transform="rotate(120 120 120)" stroke-dashoffset="9999"/>
+            </svg>
+            <div class="dial-center">
+              <p class="dial-date" id="todayLabel">—</p>
+              <p id="clock" class="clock">00:00</p>
+              <div class="dial-state">
+                <span id="live" hidden></span>
+                <span id="liveText"></span>
+                <span id="dayState">—</span>
+              </div>
+            </div>
+            <p class="dial-pct" id="dialPct">0%</p>
           </div>
-          <p id="clock" class="clock">00:00:00</p>
-          <p class="muted" style="margin-top:8px"><span id="todayLabel">—</span> · <span id="dayState">—</span></p>
 
-          <p class="label"><span id="live" hidden></span>今日</p>
-          <div class="hero-row">
-            <p id="hero" class="hero-num">¥0.00</p>
-            <p id="food" class="food"></p>
+          <div class="today">
+            <p class="caption">今日所赚</p>
+            <div class="hero-line">
+              <p id="hero" class="hero-num">¥0.00</p>
+              <p id="food" class="food"></p>
+            </div>
+            <div class="chips">
+              <p id="punchStatus"></p>
+              <p id="spendInfo"></p>
+              <p id="rentInfo"></p>
+              <p id="secLine"></p>
+            </div>
           </div>
-          <div class="stack">
-            <p id="punchStatus"></p>
-            <p id="spendInfo" class="muted"></p>
-            <p id="rentInfo" class="muted"></p>
-            <p id="secLine" class="muted"></p>
-          </div>
-          <div class="stats">
-            <div><span>工资</span><b id="payToday">¥0.00</b></div>
-            <div><span>股票</span><b id="stockToday">¥0.00</b></div>
+
+          <div class="metrics">
+            <div><span class="k">工资</span><b class="v" id="payToday">¥0.00</b></div>
+            <div><span class="k">股票</span><b class="v" id="stockToday">¥0.00</b></div>
           </div>
           <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
-          <div class="stack">
+          <div class="sub">
             <p id="shiftLine"></p>
             <p id="stockEq"></p>
           </div>
 
-          <div class="block">
-            <h2>本月</h2>
+          <div class="month">
+            <div class="month-head">
+              <p class="caption">本月所赚</p>
+              <p id="forecast"></p>
+            </div>
             <dl class="ledger">
               <div><dt>所赚</dt><dd id="monthEarn">¥0.00</dd></div>
               <div><dt>工资</dt><dd id="monthPay">¥0.00</dd></div>
               <div><dt>股票</dt><dd id="monthStock">¥0.00</dd></div>
               <div><dt>开销</dt><dd id="monthSpend">¥0.00</dd></div>
             </dl>
-            <div class="stack">
-              <p id="forecast" class="muted"></p>
-              <p id="bookTotal"></p>
-            </div>
+            <p id="bookTotal"></p>
           </div>
         </div>
       </section>
 
       <section class="face back">
         <div class="sheet">
-          <div class="top">
-            <h1>设置</h1>
-            <button type="button" class="quiet" id="openFront">完成</button>
-          </div>
-
-          <div class="block">
-            <h2>今日</h2>
+          <div class="card">
+            <h2 class="section-title">今日打卡</h2>
             <div class="grid2">
               <label class="field">上班<input id="punchIn" type="time"></label>
               <label class="field">下班<input id="punchOut" type="time"></label>
             </div>
             <div class="row-actions">
-              <button type="button" id="useShiftStart">按班次</button>
+              <button type="button" class="btn" id="useShiftStart">按班次</button>
             </div>
           </div>
 
-          <div class="block">
-            <h2>昨日</h2>
-            <label class="field" style="margin-top:12px">开销
-              <input id="ySpend" type="text" inputmode="decimal" autocomplete="off">
-            </label>
-            <p id="ySpendHint" class="muted" style="margin-top:8px"></p>
+          <div class="card">
+            <h2 class="section-title">开销</h2>
+            <div class="grid2">
+              <label class="field">昨日开销<input id="ySpend" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></label>
+              <label class="field">月房租<input id="rent" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></label>
+            </div>
+            <p id="ySpendHint" class="hint"></p>
+            <p id="rentNote" class="hint"></p>
           </div>
 
-          <div class="block">
-            <h2>薪资</h2>
-            <label class="field" style="margin-top:12px">月薪
-              <input id="salary" type="text" inputmode="decimal" autocomplete="off">
-            </label>
-            <label class="field" style="margin-top:12px">房租
-              <input id="rent" type="text" inputmode="decimal" autocomplete="off">
-            </label>
-            <p id="rentNote" class="muted" style="margin-top:8px"></p>
+          <div class="card">
+            <h2 class="section-title">薪资与班次</h2>
+            <label class="field">月薪<input id="salary" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></label>
             <div class="grid2">
               <label class="field">上班<input id="start" type="time" value="09:00"></label>
               <label class="field">下班<input id="end" type="time" value="18:00"></label>
-              <label class="field">午休起<input id="lunchStart" type="time" value="12:00"></label>
-              <label class="field">午休止<input id="lunchEnd" type="time" value="13:30"></label>
+              <label class="field">午休开始<input id="lunchStart" type="time" value="12:00"></label>
+              <label class="field">午休结束<input id="lunchEnd" type="time" value="13:30"></label>
             </div>
-            <label class="field" style="margin-top:14px">加班倍率
-              <span class="ot-row">
-                <input id="ot" type="range" min="0" max="3" step="0.1" value="1">
-                <b id="otLabel">1.0 倍</b>
-              </span>
-            </label>
-            <div class="checks" id="weekdays">
-              <span class="muted">工作日</span>
-              <label><input type="checkbox" data-dow="1" checked>一</label>
-              <label><input type="checkbox" data-dow="2" checked>二</label>
-              <label><input type="checkbox" data-dow="3" checked>三</label>
-              <label><input type="checkbox" data-dow="4" checked>四</label>
-              <label><input type="checkbox" data-dow="5" checked>五</label>
-              <label><input type="checkbox" data-dow="6">六</label>
-              <label><input type="checkbox" data-dow="0">日</label>
-              <label><input type="checkbox" id="useHoliday" checked>2026 放假</label>
-              <label><input type="checkbox" id="deductLunch" checked>午休不计</label>
+            <div class="ot-head"><span>加班倍率</span><b id="otLabel">1.0 倍</b></div>
+            <input id="ot" type="range" min="0" max="3" step="0.1" value="1" aria-label="加班倍率">
+            <div class="ticks"><span>0</span><span>1</span><span>2</span><span>3</span></div>
+            <div class="checks days" id="weekdays">
+              <label><input type="checkbox" data-dow="1" checked><span>一</span></label>
+              <label><input type="checkbox" data-dow="2" checked><span>二</span></label>
+              <label><input type="checkbox" data-dow="3" checked><span>三</span></label>
+              <label><input type="checkbox" data-dow="4" checked><span>四</span></label>
+              <label><input type="checkbox" data-dow="5" checked><span>五</span></label>
+              <label><input type="checkbox" data-dow="6"><span>六</span></label>
+              <label><input type="checkbox" data-dow="0"><span>日</span></label>
             </div>
-            <p id="rateNote" class="muted" style="margin-top:8px"></p>
+            <div class="checks">
+              <label><input type="checkbox" id="useHoliday" checked><span>2026 放假调休</span></label>
+              <label><input type="checkbox" id="deductLunch" checked><span>午休不计薪</span></label>
+            </div>
+            <p id="rateNote" class="hint"></p>
           </div>
 
-          <div class="block">
-            <h2>股票</h2>
+          <div class="card">
+            <h2 class="section-title">持仓</h2>
             <p id="bookExplain" hidden></p>
-            <div id="positions" style="margin-top:8px"></div>
+            <div id="positions"></div>
             <div class="adder">
               <div class="suggest-wrap">
-                <label class="field">名称
+                <label class="field">股票
                   <input id="stockQ" type="text" placeholder="代码或名称" autocomplete="off" spellcheck="false">
                 </label>
                 <div id="suggest" hidden></div>
               </div>
               <label class="field">股数<input id="stockQty" type="text" inputmode="decimal" autocomplete="off"></label>
               <label class="field">成本<input id="stockCost" type="text" inputmode="decimal" autocomplete="off"></label>
-              <button type="button" id="addStock">加入</button>
+              <button type="button" class="btn gold" id="addStock">加入</button>
             </div>
-            <p id="quoteStatus" class="muted" style="margin-top:8px"></p>
+            <p id="quoteStatus" class="hint"></p>
           </div>
 
-          <div class="block">
+          <div class="card">
             <div class="cal-head">
-              <h2>休假</h2>
-              <p id="calTitle"></p>
-              <span>
-                <button type="button" id="prevMonth">上月</button>
-                <button type="button" id="nextMonth">下月</button>
-              </span>
+              <h2 class="section-title">休假</h2>
+              <div class="cal-nav">
+                <button type="button" class="icon-btn" id="prevMonth" aria-label="上个月">
+                  <svg viewBox="0 0 12 12"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg>
+                </button>
+                <p id="calTitle"></p>
+                <button type="button" class="icon-btn" id="nextMonth" aria-label="下个月">
+                  <svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg>
+                </button>
+              </div>
             </div>
             <div id="calGrid" class="cal"></div>
             <p id="calNote" hidden></p>
           </div>
 
-          <div class="block">
-            <button type="button" id="copyBtn">复制</button>
-          </div>
+          <button type="button" class="btn" id="copyBtn">复制今日小结</button>
+          <p class="legal">行情来自腾讯证券与雅虎财经，可能延迟，仅供个人记账</p>
         </div>
       </section>
     </div>

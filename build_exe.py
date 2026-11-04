@@ -14,6 +14,7 @@ PyInstaller.__main__.run([
     "--windowed",
     "--onefile",
     "--name", "秒薪",
+    "--icon", str(HERE / "icon.ico"),
     "--distpath", str(HERE / "dist"),
     "--workpath", str(HERE / "build"),
     "--specpath", str(HERE / "build"),
