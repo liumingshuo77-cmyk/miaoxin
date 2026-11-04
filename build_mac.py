@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 from pathlib import Path
 
@@ -66,6 +67,10 @@ def main():
     for previous in licenses.iterdir():
         if previous.is_file():
             previous.unlink()
+    python_license = Path(sysconfig.get_path("stdlib")) / "LICENSE.txt"
+    shutil.copy2(python_license, licenses / "Python-LICENSE.txt")
+    for notice in (here / "licenses").glob("*.txt"):
+        shutil.copy2(notice, licenses / notice.name)
     for package in ("pywebview", "bottle", "proxy_tools", "certifi", "pyobjc-core", "pyobjc-framework-Cocoa",
                     "pyobjc-framework-WebKit", "pyobjc-framework-Quartz", "pyobjc-framework-security", "PyInstaller"):
         distribution = importlib.metadata.distribution(package)
