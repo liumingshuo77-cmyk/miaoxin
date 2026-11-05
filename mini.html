@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>秒薪</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #efe9df;
+      --muted: #7f786e;
+      --gold: #d2b47c;
+      --up: #7cc49a;
+      --down: #e58a79;
+      --num: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      --ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; background: #111110; }
+    body { font: 13px/1.2 var(--ui); color: var(--ink); user-select: none; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .pill {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 0 14px;
+      background: #161514;
+      border-bottom: 1px solid rgba(210, 180, 124, 0.35);
+    }
+    .mark {
+      width: 22px;
+      height: 22px;
+      flex: none;
+      border-radius: 50%;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+    }
+    .copy { flex: 1; min-width: 0; }
+    .k { display: block; font-size: 10px; letter-spacing: 0.22em; color: var(--muted); }
+    #num {
+      display: block;
+      margin-top: 2px;
+      font-family: var(--num);
+      font-size: 22px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+    #num.down { color: var(--down); }
+    #food { flex: none; font-size: 16px; width: 1.2em; text-align: center; }
+    #food:empty { display: none; }
+    button {
+      height: 28px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+    }
+    #open { padding: 0 8px; letter-spacing: 0.12em; }
+    #open:hover, #shut:hover { background: rgba(255, 245, 230, 0.06); color: var(--ink); }
+    #shut { width: 28px; font-size: 16px; line-height: 1; }
+  </style>
+</head>
+<body>
+  <div class="pill pywebview-drag-region">
+    <span class="mark pywebview-drag-region">秒</span>
+    <div class="copy pywebview-drag-region">
+      <span class="k">今日所赚</span>
+      <b id="num">¥0.00</b>
+    </div>
+    <span id="food"></span>
+    <button type="button" id="open">展开</button>
+    <button type="button" id="shut" aria-label="关闭">×</button>
+  </div>
+  <script>
+    function render(data) {
+      const text = data && data.text ? String(data.text) : "¥0.00";
+      const mood = data && data.mood ? String(data.mood) : "";
+      const num = document.getElementById("num");
+      num.textContent = text;
+      num.className = text.charAt(0) === "-" ? "down" : "";
+      const food = document.getElementById("food");
+      food.textContent = mood === "up" ? "🍖" : mood === "down" ? "🍜" : "";
+      return true;
+    }
+    function boot() {
+      const api = window.pywebview && pywebview.api;
+      if (!api) return;
+      document.getElementById("open").addEventListener("click", () => api.restore());
+      document.getElementById("shut").addEventListener("click", () => api.close());
+      Promise.resolve(api.pull_live()).then(render).catch(() => {});
+    }
+    window.addEventListener("pywebviewready", boot);
+    if (window.pywebview && pywebview.api) boot();
+  </script>
+</body>
+</html>

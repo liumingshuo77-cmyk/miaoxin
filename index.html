@@ -197,19 +197,21 @@
 
     .metrics {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       margin-top: 16px;
       border-top: 1px solid var(--hair);
       border-bottom: 1px solid var(--hair);
     }
     .metrics > div { padding: 11px 0 10px; text-align: center; }
     .metrics > div + div { border-left: 1px solid var(--hair); }
+    .metrics .k { letter-spacing: 0.16em; }
+    .metrics .v { font-size: 16px; }
     .k { display: block; font-size: 10px; letter-spacing: 0.3em; color: var(--muted); }
     .v {
       display: block;
       margin-top: 3px;
       font-family: var(--num);
-      font-size: 19px;
+      font-size: 16px;
       font-weight: 400;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -237,8 +239,8 @@
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
-    #bookTotal { margin-top: 8px; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
-    #bookTotal:empty { display: none; }
+    #bookTotal, #monthSettle { margin-top: 8px; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    #bookTotal:empty, #monthSettle:empty { display: none; }
 
     /* 设置 */
     .back .sheet { padding-top: 4px; display: flex; flex-direction: column; gap: 10px; }
@@ -406,7 +408,7 @@
     </div>
     <button type="button" class="tb-btn text" id="openBack" title="设置">设置</button>
     <button type="button" class="tb-btn text" id="openFront" title="完成">完成</button>
-    <button type="button" class="tb-btn" id="winMin" title="最小化" aria-label="最小化">
+    <button type="button" class="tb-btn" id="winMin" title="小窗" aria-label="小窗">
       <svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>
     </button>
     <button type="button" class="tb-btn close" id="winClose" title="关闭" aria-label="关闭">
@@ -458,7 +460,8 @@
 
           <div class="metrics">
             <div><span class="k">工资</span><b class="v" id="payToday">¥0.00</b></div>
-            <div><span class="k">股票</span><b class="v" id="stockToday">¥0.00</b></div>
+            <div><span class="k">波动</span><b class="v" id="stockToday">¥0.00</b></div>
+            <div><span class="k">结算</span><b class="v" id="settleToday">¥0.00</b></div>
           </div>
           <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
           <div class="sub">
@@ -477,6 +480,7 @@
               <div><dt>股票</dt><dd id="monthStock">¥0.00</dd></div>
               <div><dt>开销</dt><dd id="monthSpend">¥0.00</dd></div>
             </dl>
+            <p id="monthSettle"></p>
             <p id="bookTotal"></p>
           </div>
         </div>

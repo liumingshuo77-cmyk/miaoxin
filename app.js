@@ -379,6 +379,21 @@ function salePnl(sale) {
   if (cost == null || !(sell > 0) || !(qty > 0) || !(fx > 0)) return null;
   return (sell - cost) * qty * fx;
 }
+function saleMove(sale) {
+  const prev = num(sale && sale.prevClose);
+  const sell = num(sale && sale.sell);
+  const qty = num(sale && sale.qty);
+  const fx = num(sale && sale.fx);
+  if (!(prev > 0) || !(sell > 0) || !(qty > 0) || !(fx > 0)) return 0;
+  return (sell - prev) * qty * fx;
+}
+function movesOn(sales, iso) {
+  let sum = 0;
+  for (const sale of sales || []) {
+    if (sale && sale.date === iso) sum += saleMove(sale);
+  }
+  return sum;
+}
 function realizedOn(sales, iso) {
   let sum = 0;
   for (const sale of sales || []) {
@@ -460,10 +475,10 @@ function tick() {
   const rentSoFar = rentThrough(y, m, iso, state);
   const realizedToday = realizedOn(state.sales, iso);
   const realizedMonth = realizedThrough(state.sales, y, m, iso);
-  const stockDay = stock.day + realizedToday;
+  const dayMove = stock.day + movesOn(state.sales, iso);
   const stockMonth = stock.month + realizedMonth;
   const payToday = acc.pay;
-  const earnToday = payToday + stockDay - rentDay;
+  const earnToday = payToday + dayMove - rentDay;
   const monthPay = monthSalary(state, state.sessions, now);
   const earnMonth = monthPay + stockMonth - spent - rentSoFar;
   const std = standardSeconds(state);
@@ -482,16 +497,23 @@ function tick() {
   byId("dayState").textContent = dayStateText(iso);
   byId("hero").textContent = money(earnToday);
   byId("hero").className = "hero-num" + (earnToday < -0.005 ? " down" : "");
-  paintFood(stockDay);
+  paintFood(dayMove);
   byId("payToday").textContent = money(payToday);
   const stockNode = byId("stockToday");
-  stockNode.textContent = moneySigned(stockDay);
-  stockNode.className = stockDay > 0.005 ? "up" : stockDay < -0.005 ? "down" : "";
+  stockNode.textContent = moneySigned(dayMove);
+  stockNode.className = "v " + cls(dayMove);
+  const settleNode = byId("settleToday");
+  if (settleNode) {
+    settleNode.textContent = moneySigned(realizedToday);
+    settleNode.className = "v " + cls(realizedToday);
+  }
   byId("monthEarn").textContent = money(earnMonth);
   byId("monthPay").textContent = money(monthPay);
   const ms = byId("monthStock");
   ms.textContent = moneySigned(stockMonth);
   ms.className = stockMonth > 0.005 ? "up" : stockMonth < -0.005 ? "down" : "";
+  const monthSettle = byId("monthSettle");
+  if (monthSettle) monthSettle.textContent = Math.abs(realizedMonth) > 0.005 ? "结算 " + moneySigned(realizedMonth) : "";
   byId("monthSpend").textContent = money(spent + rentSoFar);
   const rentInfo = byId("rentInfo");
   if (rentInfo) rentInfo.textContent = rentDay > 0.005 ? "房租 " + money(-rentDay) : "";
@@ -518,7 +540,7 @@ function tick() {
     : "";
 
   paintShift(now, acc, std);
-  paintStockEq(stockDay, perSec);
+  paintStockEq(dayMove, perSec);
   paintForecast(now, stockMonth, spent);
   paintBook(stock);
   paintSessions(iso);
@@ -529,7 +551,8 @@ function tick() {
     iso + " 秒薪",
     "今日所赚 " + money(earnToday),
     "今日工资 " + money(payToday),
-    "今日股票 " + moneySigned(stockDay),
+    "今日波动 " + moneySigned(dayMove),
+    "今日结算 " + moneySigned(realizedToday),
     "昨日开销 " + money(ySpent),
     "今日房租 " + money(rentDay),
     "本月所赚 " + money(earnMonth),
@@ -542,6 +565,8 @@ function tick() {
     document.title = clockText + "  " + money(earnToday);
     lastTitle = now.getTime();
   }
+  const mood = dayMove > 0.005 ? "up" : dayMove < -0.005 ? "down" : "";
+  pushLive(money(earnToday), mood);
 }
 function dayStateText(iso) {
   const kind = kindOf(iso, state);
@@ -552,11 +577,20 @@ function dayStateText(iso) {
   if (state.useHoliday !== false && HOLIDAY_OFF[iso]) return HOLIDAY_OFF[iso];
   return "休息";
 }
+let liveSent = "";
+function pushLive(text, mood) {
+  const key = text + "\n" + (mood || "");
+  if (key === liveSent) return;
+  liveSent = key;
+  const api = desktopApi();
+  if (!api || !api.set_live) return;
+  Promise.resolve(api.set_live(text, mood || "")).catch(() => {});
+}
 function paintFood(day) {
   const node = byId("food");
   if (!node) return;
-  const up = state.holdings.length && day > 0.005;
-  const down = state.holdings.length && day < -0.005;
+  const up = day > 0.005;
+  const down = day < -0.005;
   node.textContent = up ? "🍖" : down ? "🍜" : "";
   if (up) node.dataset.word = "吃肉";
   else if (down) node.dataset.word = "吃面";
@@ -738,11 +772,24 @@ function cls(n) {
   if (n < -0.005) return "down";
   return "";
 }
-function confirmSell(h, raw) {
-  const sell = num(raw);
+function trimQty(n) {
+  return String(Math.round(n * 10000) / 10000);
+}
+function confirmSell(h, priceRaw, qtyRaw) {
+  const sell = num(priceRaw);
+  const qty = num(qtyRaw);
+  const held = num(h.qty);
   const cost = costOf(h);
   if (!(sell > 0)) {
     byId("quoteStatus").textContent = "填写卖出价";
+    return;
+  }
+  if (!(qty > 0)) {
+    byId("quoteStatus").textContent = "填写股数";
+    return;
+  }
+  if (qty - held > 0.0001) {
+    byId("quoteStatus").textContent = "超过持仓";
     return;
   }
   if (cost == null) {
@@ -760,15 +807,18 @@ function confirmSell(h, raw) {
     id: Math.random().toString(36).slice(2, 10),
     symbol: h.symbol,
     name: h.name || (q && q.name) || h.symbol,
-    qty: String(h.qty),
+    qty: String(qtyRaw).trim(),
     cost: String(h.cost),
-    sell: String(raw).trim(),
+    sell: String(priceRaw).trim(),
+    prevClose: q && q.prevClose > 0 ? q.prevClose : 0,
     fx: fx,
     currency: currency,
     date: isoDate(new Date()),
   };
   state.sales.push(sale);
-  state.holdings = state.holdings.filter((x) => x.id !== h.id);
+  const left = held - qty;
+  if (left <= 0.0001) state.holdings = state.holdings.filter((x) => x.id !== h.id);
+  else h.qty = trimQty(left);
   const pnl = salePnl(sale);
   byId("quoteStatus").textContent = "已结算 " + (pnl == null ? "" : moneySigned(pnl));
   save(true);
@@ -777,7 +827,9 @@ function confirmSell(h, raw) {
 }
 function undoSale(sale) {
   state.sales = state.sales.filter((x) => x.id !== sale.id);
-  if (!state.holdings.some((h) => h.symbol === sale.symbol)) {
+  const held = state.holdings.find((h) => h.symbol === sale.symbol);
+  if (held) held.qty = trimQty(num(held.qty) + num(sale.qty));
+  else {
     state.holdings.push({
       id: Math.random().toString(36).slice(2, 10),
       symbol: sale.symbol,
@@ -854,23 +906,31 @@ function renderPositions() {
       if (open) { open.remove(); return; }
       const bar = document.createElement("div");
       bar.className = "sellbar";
-      const input = document.createElement("input");
-      input.type = "text";
-      input.inputMode = "decimal";
-      input.placeholder = "卖出价";
-      input.setAttribute("aria-label", "卖出价");
+      const qtyInput = document.createElement("input");
+      qtyInput.type = "text";
+      qtyInput.inputMode = "decimal";
+      qtyInput.placeholder = "股数";
+      qtyInput.setAttribute("aria-label", "卖出股数");
+      qtyInput.value = String(h.qty);
+      const priceInput = document.createElement("input");
+      priceInput.type = "text";
+      priceInput.inputMode = "decimal";
+      priceInput.placeholder = "卖出价";
+      priceInput.setAttribute("aria-label", "卖出价");
       const q = quoteBook[h.symbol];
-      if (q && q.price > 0) input.value = String(q.price);
+      if (q && q.price > 0) priceInput.value = String(q.price);
       const ok = document.createElement("button");
       ok.type = "button";
       ok.className = "btn gold";
       ok.textContent = "结算";
-      ok.addEventListener("click", () => confirmSell(h, input.value));
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmSell(h, input.value); });
-      bar.append(input, ok);
+      const go = () => confirmSell(h, priceInput.value, qtyInput.value);
+      ok.addEventListener("click", go);
+      priceInput.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+      qtyInput.addEventListener("keydown", (e) => { if (e.key === "Enter") priceInput.focus(); });
+      bar.append(qtyInput, priceInput, ok);
       row.append(bar);
-      input.focus();
-      input.select();
+      priceInput.focus();
+      priceInput.select();
     });
     const del = document.createElement("button");
     del.type = "button";
@@ -1109,9 +1169,20 @@ function renderCalendar() {
     const tag = document.createElement("span");
     tag.className = "k " + tagClass(iso);
     tag.textContent = dayTag(iso);
+    if (num(state.expenses[iso])) btn.classList.add("has-spend");
     btn.append(numEl, tag);
-    btn.title = "默认 / 带薪 / 无薪 / 休息 / 加班";
-    btn.addEventListener("click", () => cycleLeave(iso));
+    const spentText = num(state.expenses[iso]) ? "开销 " + money(num(state.expenses[iso])) + " · " : "";
+    btn.title = spentText + "单击切换 · 双击记开销";
+    let clickTimer = 0;
+    btn.addEventListener("click", () => {
+      clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => cycleLeave(iso), 220);
+    });
+    btn.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      clearTimeout(clickTimer);
+      openSpend(iso);
+    });
     grid.append(btn);
   }
   byId("calTitle").textContent = viewYear + "年" + viewMonth + "月";
@@ -1134,6 +1205,28 @@ function tagClass(iso) {
   if (kind === "unpaid") return "tag-unpaid";
   if (kind === "off") return "tag-off";
   return "tag-work";
+}
+let spendEdit = "";
+function openSpend(iso) {
+  spendEdit = iso;
+  const bar = byId("daySpend");
+  if (!bar) return;
+  bar.hidden = false;
+  byId("daySpendLabel").textContent = prettyDate(iso);
+  const input = byId("daySpendInput");
+  input.value = state.expenses[iso] != null ? state.expenses[iso] : "";
+  input.focus();
+  input.select();
+}
+function saveDaySpend() {
+  if (!spendEdit) return;
+  const input = byId("daySpendInput");
+  const v = input.value.trim();
+  if (!v) delete state.expenses[spendEdit];
+  else state.expenses[spendEdit] = v;
+  if (spendEdit === yesterdayKey(new Date())) spendShown = "";
+  save();
+  renderCalendar();
 }
 function cycleLeave(iso) {
   const order = ["", "paid", "unpaid", "off", "work"];
@@ -1200,6 +1293,8 @@ function bind() {
     saveYesterdayFromInput(new Date());
     save();
   });
+  const daySpendInput = byId("daySpendInput");
+  if (daySpendInput) daySpendInput.addEventListener("input", saveDaySpend);
   byId("punchIn").addEventListener("input", applyPunch);
   byId("punchOut").addEventListener("input", applyPunch);
   byId("useShiftStart").addEventListener("click", () => {
@@ -1324,6 +1419,7 @@ if (typeof module !== "undefined" && module.exports) {
     rentPerDay: rentPerDay,
     rentThrough: rentThrough,
     salePnl: salePnl,
+    saleMove: saleMove,
     realizedOn: realizedOn,
     realizedThrough: realizedThrough,
     HOLIDAY_OFF: HOLIDAY_OFF,

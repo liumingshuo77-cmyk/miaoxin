@@ -20,6 +20,7 @@ PyInstaller.__main__.run([
     "--specpath", str(HERE / "build"),
     "--add-data", str(HERE / "index.html") + ";.",
     "--add-data", str(HERE / "app.js") + ";.",
+    "--add-data", str(HERE / "mini.html") + ";.",
     "--collect-all", "webview",
     "--collect-all", "pythonnet",
     "秒薪.pyw",
